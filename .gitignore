@@ -1,0 +1,156 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project specific
+data/
+logs/
+*.log
+scrapinium.db
+*.sqlite
+*.sqlite3
+
+# Docker
+.dockerignore
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Poetry
+poetry.lock
+
+# Reflex
+.web/
+assets/generated/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# API keys and secrets
+.env.local
+.env.production
+config/secrets.yaml
+
+# Ollama models cache
+ollama_cache/
+
+# Redis dump
+dump.rdb
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Monitoring
+prometheus_data/
+
+# Browser cache and data (Playwright)
+browser-data/
+playwright-cache/
+.playwright/
+
+# Cache directories (nouveaux modules cache)
+cache/
+.cache/
+
+# Test artifacts et optimisations
+test-results/
+test-output/
+screenshots/
+performance-results/
+benchmark-results/
+
+# Memory dumps et profiling
+*.prof
+*.hprof
+*.dump
+
+# Static files et uploads
+static/uploads/
+media/
+
+# Certificates
+*.pem
+*.key
+*.crt
+*.p12
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Local development files
+local_settings.py
+dev_settings.py
+local.py

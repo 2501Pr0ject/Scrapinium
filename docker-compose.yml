@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  scrapinium-app:
+    build: .
+    ports:
+      - "3000:3000"  # Reflex
+      - "8000:8000"  # FastAPI
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=sqlite:///./scrapinium.db
+      - OLLAMA_HOST=http://ollama:11434
+    volumes:
+      - .:/app
+      - ./data:/app/data
+    depends_on:
+      - redis
+      - ollama
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    restart: unless-stopped
+
+  celery-worker:
+    build: .
+    command: celery -A scrapinium.celery_app worker --loglevel=info
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=sqlite:///./scrapinium.db
+      - OLLAMA_HOST=http://ollama:11434
+    volumes:
+      - .:/app
+      - ./data:/app/data
+    depends_on:
+      - redis
+      - ollama
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  ollama_data:

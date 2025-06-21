@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🕸️ Scrapinium - Scraping Intelligent</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <style>
+        /* Custom styles for dark theme */
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+        .glass {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(100, 116, 139, 0.3);
+        }
+        .gradient-primary {
+            background: linear-gradient(45deg, #6366f1, #e879f9);
+        }
+        .animate-pulse-slow {
+            animation: pulse 3s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-100" x-data="scrapiniumApp()">
+    <!-- Header -->
+    <header class="glass sticky top-0 z-50">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <h1 class="text-2xl font-bold text-indigo-400">🕸️ Scrapinium</h1>
+                    <span class="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-sm">v0.1.0</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                        <span class="text-sm text-slate-300">API Online</span>
+                    </div>
+                    <button class="bg-slate-700/50 hover:bg-slate-600/50 px-4 py-2 rounded-lg transition-colors">
+                        ⚙️ Paramètres
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-6 py-8">
+        <!-- Stats Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="glass rounded-xl p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-slate-400 text-sm">Total des tâches</p>
+                        <p class="text-2xl font-bold text-slate-100" x-text="stats.total_tasks">0</p>
+                    </div>
+                    <div class="text-indigo-400 text-3xl">📊</div>
+                </div>
+            </div>
+            <div class="glass rounded-xl p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-slate-400 text-sm">Tâches actives</p>
+                        <p class="text-2xl font-bold text-slate-100" x-text="stats.active_tasks">0</p>
+                    </div>
+                    <div class="text-yellow-400 text-3xl">⚡</div>
+                </div>
+            </div>
+            <div class="glass rounded-xl p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-slate-400 text-sm">Taux de succès</p>
+                        <p class="text-2xl font-bold text-slate-100" x-text="stats.success_rate + '%'">0%</p>
+                    </div>
+                    <div class="text-green-400 text-3xl">✅</div>
+                </div>
+            </div>
+            <div class="glass rounded-xl p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-slate-400 text-sm">LLM Status</p>
+                        <p class="text-2xl font-bold text-slate-100" x-text="stats.ollama_status">-</p>
+                    </div>
+                    <div class="text-purple-400 text-3xl">🧠</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Scraping Form -->
+            <div class="glass rounded-xl p-6">
+                <h2 class="text-xl font-semibold text-slate-100 mb-6 flex items-center">
+                    🕸️ Nouveau Scraping
+                </h2>
+                
+                <form @submit.prevent="submitScraping" class="space-y-6">
+                    <!-- URL Input -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">URL à scraper</label>
+                        <input 
+                            type="url" 
+                            x-model="form.url"
+                            placeholder="https://example.com/article"
+                            class="w-full bg-slate-800/50 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            required
+                        />
+                    </div>
+
+                    <!-- Options -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Format de sortie</label>
+                            <select 
+                                x-model="form.output_format"
+                                class="w-full bg-slate-800/50 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                                <option value="markdown">📝 Markdown</option>
+                                <option value="text">📄 Text</option>
+                                <option value="json">🔗 JSON</option>
+                                <option value="html">🌐 HTML</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center space-x-4 pt-8">
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    x-model="form.use_llm"
+                                    class="w-4 h-4 text-indigo-600 bg-slate-800 border-slate-600 rounded focus:ring-indigo-500"
+                                />
+                                <span class="text-sm text-slate-300">Utiliser LLM</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Custom Instructions -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Instructions personnalisées (optionnel)</label>
+                        <textarea 
+                            x-model="form.custom_instructions"
+                            placeholder="Ex: Extraire uniquement les titres et les résumés..."
+                            rows="3"
+                            class="w-full bg-slate-800/50 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                        ></textarea>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button 
+                        type="submit"
+                        :disabled="isLoading"
+                        class="w-full gradient-primary text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-indigo-500/25"
+                    >
+                        <span x-show="!isLoading">🚀 Lancer le scraping</span>
+                        <span x-show="isLoading" class="flex items-center justify-center space-x-2">
+                            <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>Scraping en cours...</span>
+                        </span>
+                    </button>
+
+                    <!-- Progress Bar -->
+                    <div x-show="isLoading" class="mt-4">
+                        <div class="bg-slate-700 rounded-full h-2">
+                            <div class="gradient-primary h-2 rounded-full animate-pulse-slow" style="width: 75%"></div>
+                        </div>
+                        <p class="text-sm text-slate-400 mt-2">Extraction du contenu en cours...</p>
+                    </div>
+                </form>
+
+                <!-- Notification -->
+                <div x-show="notification.show" x-transition class="mt-4">
+                    <div 
+                        :class="{
+                            'bg-green-500/20 border-green-500/50 text-green-400': notification.type === 'success',
+                            'bg-red-500/20 border-red-500/50 text-red-400': notification.type === 'error',
+                            'bg-blue-500/20 border-blue-500/50 text-blue-400': notification.type === 'info'
+                        }"
+                        class="border rounded-lg p-4"
+                    >
+                        <p x-text="notification.message"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tasks List -->
+            <div class="glass rounded-xl p-6">
+                <h2 class="text-xl font-semibold text-slate-100 mb-6 flex items-center">
+                    📋 Tâches récentes
+                </h2>
+
+                <div x-show="tasks.length === 0" class="text-center py-12">
+                    <div class="text-6xl mb-4">📋</div>
+                    <p class="text-slate-400 text-lg">Aucune tâche</p>
+                    <p class="text-slate-500 text-sm">Vos tâches de scraping apparaîtront ici</p>
+                </div>
+
+                <div class="space-y-4" x-show="tasks.length > 0">
+                    <template x-for="task in tasks" :key="task.id">
+                        <div class="bg-slate-800/30 border border-slate-700 rounded-lg p-4 hover:bg-slate-700/30 transition-colors">
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1">
+                                    <p class="text-slate-100 font-medium" x-text="task.url.length > 50 ? task.url.substring(0, 50) + '...' : task.url"></p>
+                                    <div class="flex items-center space-x-4 mt-2">
+                                        <span 
+                                            :class="{
+                                                'bg-green-500/20 text-green-400': task.status === 'completed',
+                                                'bg-yellow-500/20 text-yellow-400': task.status === 'running',
+                                                'bg-red-500/20 text-red-400': task.status === 'failed',
+                                                'bg-blue-500/20 text-blue-400': task.status === 'pending'
+                                            }"
+                                            class="px-2 py-1 rounded text-xs font-medium"
+                                            x-text="task.status"
+                                        ></span>
+                                        <span class="text-slate-400 text-sm" x-text="'Format: ' + task.output_format"></span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button 
+                                        @click="viewResult(task.id)"
+                                        x-show="task.status === 'completed'"
+                                        class="bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 hover:text-white px-3 py-1 rounded text-sm transition-colors"
+                                    >
+                                        👁️ Voir
+                                    </button>
+                                    <button 
+                                        x-show="task.status === 'completed'"
+                                        class="bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 hover:text-white px-3 py-1 rounded text-sm transition-colors"
+                                    >
+                                        💾 Export
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Result Modal -->
+    <div x-show="modal.show" x-transition class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(0, 0, 0, 0.8);">
+        <div class="glass rounded-xl p-6 max-w-4xl w-full max-h-[80vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-semibold text-slate-100">Résultat du scraping</h3>
+                <button @click="modal.show = false" class="text-slate-400 hover:text-white text-2xl">×</button>
+            </div>
+            <div class="bg-slate-900/50 rounded-lg p-4 max-h-96 overflow-y-auto">
+                <pre class="text-slate-300 text-sm whitespace-pre-wrap" x-text="modal.content"></pre>
+            </div>
+            <div class="flex justify-end space-x-4 mt-6">
+                <button @click="modal.show = false" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors">
+                    Fermer
+                </button>
+                <button class="gradient-primary text-white px-4 py-2 rounded-lg transition-colors">
+                    💾 Télécharger
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function scrapiniumApp() {
+            return {
+                // Form data
+                form: {
+                    url: '',
+                    output_format: 'markdown',
+                    use_llm: true,
+                    custom_instructions: ''
+                },
+                
+                // App state
+                isLoading: false,
+                tasks: [],
+                stats: {
+                    total_tasks: 0,
+                    active_tasks: 0,
+                    success_rate: 0,
+                    ollama_status: 'unknown'
+                },
+                
+                // UI state
+                notification: {
+                    show: false,
+                    message: '',
+                    type: 'info'
+                },
+                modal: {
+                    show: false,
+                    content: ''
+                },
+
+                async init() {
+                    await this.loadStats();
+                    await this.loadTasks();
+                },
+
+                async submitScraping() {
+                    if (!this.form.url) {
+                        this.showNotification('Veuillez saisir une URL', 'error');
+                        return;
+                    }
+
+                    this.isLoading = true;
+                    this.hideNotification();
+
+                    try {
+                        const response = await fetch('/scrape', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(this.form)
+                        });
+
+                        const result = await response.json();
+                        
+                        if (response.ok) {
+                            this.showNotification('Tâche de scraping créée avec succès!', 'success');
+                            this.form.url = '';
+                            this.form.custom_instructions = '';
+                            await this.loadTasks();
+                            await this.loadStats();
+                        } else {
+                            this.showNotification(result.detail || 'Erreur lors de la création de la tâche', 'error');
+                        }
+                    } catch (error) {
+                        this.showNotification('Erreur de connexion avec l\'API', 'error');
+                        console.error('Error:', error);
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async loadTasks() {
+                    try {
+                        const response = await fetch('/tasks?limit=10');
+                        const result = await response.json();
+                        
+                        if (response.ok) {
+                            this.tasks = result.data.tasks || [];
+                        }
+                    } catch (error) {
+                        console.error('Error loading tasks:', error);
+                    }
+                },
+
+                async loadStats() {
+                    try {
+                        const response = await fetch('/stats');
+                        const result = await response.json();
+                        
+                        if (response.ok) {
+                            this.stats = { ...this.stats, ...result.data };
+                        }
+                    } catch (error) {
+                        console.error('Error loading stats:', error);
+                    }
+                },
+
+                async viewResult(taskId) {
+                    try {
+                        const response = await fetch(`/scrape/${taskId}/result`);
+                        const result = await response.json();
+                        
+                        if (response.ok) {
+                            this.modal.content = result.data.content;
+                            this.modal.show = true;
+                        } else {
+                            this.showNotification('Résultat non disponible', 'error');
+                        }
+                    } catch (error) {
+                        this.showNotification('Erreur lors du chargement du résultat', 'error');
+                        console.error('Error:', error);
+                    }
+                },
+
+                showNotification(message, type = 'info') {
+                    this.notification = {
+                        show: true,
+                        message,
+                        type
+                    };
+                    
+                    // Auto-hide after 5 seconds
+                    setTimeout(() => {
+                        this.hideNotification();
+                    }, 5000);
+                },
+
+                hideNotification() {
+                    this.notification.show = false;
+                }
+            }
+        }
+    </script>
+</body>
+</html>

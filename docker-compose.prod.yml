@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  scrapinium-app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - SCRAPINIUM_DEBUG=false
+      - SCRAPINIUM_DATABASE_URL=postgresql://scrapinium:password@postgres:5432/scrapinium
+      - SCRAPINIUM_REDIS_URL=redis://redis:6379
+      - SCRAPINIUM_OLLAMA_HOST=http://ollama:11434
+      - SCRAPINIUM_SECRET_KEY=${SECRET_KEY}
+    depends_on:
+      - postgres
+      - redis
+      - ollama
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: scrapinium
+      POSTGRES_USER: scrapinium
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scrapinium"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - scrapinium-app
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  ollama_data:
