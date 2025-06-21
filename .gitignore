@@ -74,9 +74,19 @@ Thumbs.db
 data/
 logs/
 *.log
+
+# Database files (dev/test)
 scrapinium.db
 *.sqlite
 *.sqlite3
+*.db
+
+# Demo and temporary files
+demo_*.py
+temp_*.py
+*_temp.py
+scratch.py
+debug.py
 
 # Docker
 .dockerignore
@@ -154,3 +164,36 @@ media/
 local_settings.py
 dev_settings.py
 local.py
+
+# Environment files with secrets (NEVER commit these)
+.env
+.env.local
+.env.development
+.env.production
+.env.staging
+# Exception: .env.example is safe to commit (no secrets)
+
+# Local configuration and development
+config/local.yaml
+config/dev.yaml
+config/prod.yaml
+
+# IDE and editor files
+.vscode/settings.json
+.idea/workspace.xml
+*.swp
+*.swo
+
+# OS generated files (extended)
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+
+# Temporary directories
+tmp/
+temp/
+scratch/

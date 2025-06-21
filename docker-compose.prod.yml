@@ -1,6 +1,18 @@
 version: '3.8'
 
+# Scrapinium v0.2.0 - Configuration Production
+# 
+# ⚠️  ATTENTION: Configuration pour déploiement production
+# - PostgreSQL au lieu de SQLite
+# - Nginx reverse proxy avec SSL
+# - Health checks et monitoring
+# - Support GPU pour Ollama
+# - Sécurité renforcée
+#
+# Déploiement: docker-compose -f docker-compose.prod.yml up -d
+
 services:
+  # Application principale Scrapinium (production-ready)
   scrapinium-app:
     build: .
     ports:

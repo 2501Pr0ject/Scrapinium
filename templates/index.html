@@ -32,7 +32,7 @@
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-4">
                     <h1 class="text-2xl font-bold text-indigo-400">🕸️ Scrapinium</h1>
-                    <span class="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-sm">v0.1.0</span>
+                    <span class="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-sm">v0.2.0</span>
                 </div>
                 <div class="flex items-center space-x-4">
                     <div class="flex items-center space-x-2">
@@ -49,111 +49,245 @@
 
     <!-- Main Content -->
     <main class="container mx-auto px-6 py-8">
-        <!-- Stats Overview -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div class="glass rounded-xl p-6">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-slate-400 text-sm">Total des tâches</p>
-                        <p class="text-2xl font-bold text-slate-100" x-text="stats.total_tasks">0</p>
+        <!-- Performance Dashboard -->
+        <div class="mb-8">
+            <h2 class="text-2xl font-bold text-slate-100 mb-6 flex items-center">
+                📊 Dashboard Performance v0.2.0
+            </h2>
+            
+            <!-- Primary Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                <div class="glass rounded-xl p-6 hover:scale-105 transition-transform">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-slate-400 text-sm">Total des tâches</p>
+                            <p class="text-2xl font-bold text-slate-100" x-text="stats.total_tasks">0</p>
+                        </div>
+                        <div class="text-indigo-400 text-3xl">📊</div>
                     </div>
-                    <div class="text-indigo-400 text-3xl">📊</div>
+                </div>
+                <div class="glass rounded-xl p-6 hover:scale-105 transition-transform">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-slate-400 text-sm">Tâches actives</p>
+                            <p class="text-2xl font-bold text-slate-100" x-text="stats.active_tasks">0</p>
+                        </div>
+                        <div class="text-yellow-400 text-3xl">⚡</div>
+                    </div>
+                </div>
+                <div class="glass rounded-xl p-6 hover:scale-105 transition-transform">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-slate-400 text-sm">Taux de succès</p>
+                            <p class="text-2xl font-bold text-slate-100" x-text="stats.success_rate + '%'">0%</p>
+                        </div>
+                        <div class="text-green-400 text-3xl">✅</div>
+                    </div>
+                </div>
+                <div class="glass rounded-xl p-6 hover:scale-105 transition-transform">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-slate-400 text-sm">LLM Status</p>
+                            <p class="text-2xl font-bold text-slate-100" x-text="stats.ollama_status">-</p>
+                        </div>
+                        <div class="text-purple-400 text-3xl">🧠</div>
+                    </div>
                 </div>
             </div>
-            <div class="glass rounded-xl p-6">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-slate-400 text-sm">Tâches actives</p>
-                        <p class="text-2xl font-bold text-slate-100" x-text="stats.active_tasks">0</p>
+
+            <!-- Advanced Performance Metrics -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Browser Pool Stats -->
+                <div class="glass rounded-xl p-6">
+                    <h3 class="text-lg font-semibold text-slate-100 mb-4 flex items-center">
+                        🌐 Pool de Navigateurs
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-400 text-sm">Navigateurs actifs</span>
+                            <span class="text-slate-100 font-medium" x-text="browserStats.active_browsers || 0">0</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-400 text-sm">Total disponibles</span>
+                            <span class="text-slate-100 font-medium" x-text="browserStats.total_browsers || 0">0</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-400 text-sm">Temps d'attente moy.</span>
+                            <span class="text-slate-100 font-medium" x-text="(browserStats.avg_wait_time_ms || 0) + 'ms'">0ms</span>
+                        </div>
+                        <div class="bg-slate-700 rounded-full h-2 mt-3">
+                            <div class="bg-gradient-to-r from-blue-500 to-cyan-400 h-2 rounded-full transition-all duration-300" 
+                                 :style="`width: ${(browserStats.active_browsers / Math.max(browserStats.total_browsers, 1)) * 100}%`"></div>
+                        </div>
                     </div>
-                    <div class="text-yellow-400 text-3xl">⚡</div>
                 </div>
-            </div>
-            <div class="glass rounded-xl p-6">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-slate-400 text-sm">Taux de succès</p>
-                        <p class="text-2xl font-bold text-slate-100" x-text="stats.success_rate + '%'">0%</p>
+
+                <!-- Cache Performance -->
+                <div class="glass rounded-xl p-6">
+                    <h3 class="text-lg font-semibold text-slate-100 mb-4 flex items-center">
+                        🗄️ Cache Multi-Niveau
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-400 text-sm">Hit Rate</span>
+                            <span class="text-green-400 font-medium" x-text="(cacheStats.hit_rate || 0).toFixed(1) + '%'">0%</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-400 text-sm">Requêtes totales</span>
+                            <span class="text-slate-100 font-medium" x-text="cacheStats.total_requests || 0">0</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-400 text-sm">Entrées mémoire</span>
+                            <span class="text-slate-100 font-medium" x-text="cacheStats.memory_cache?.entry_count || 0">0</span>
+                        </div>
+                        <div class="bg-slate-700 rounded-full h-2 mt-3">
+                            <div class="bg-gradient-to-r from-green-500 to-emerald-400 h-2 rounded-full transition-all duration-300" 
+                                 :style="`width: ${Math.min(cacheStats.hit_rate || 0, 100)}%`"></div>
+                        </div>
                     </div>
-                    <div class="text-green-400 text-3xl">✅</div>
                 </div>
-            </div>
-            <div class="glass rounded-xl p-6">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-slate-400 text-sm">LLM Status</p>
-                        <p class="text-2xl font-bold text-slate-100" x-text="stats.ollama_status">-</p>
+
+                <!-- Memory Usage -->
+                <div class="glass rounded-xl p-6">
+                    <h3 class="text-lg font-semibold text-slate-100 mb-4 flex items-center">
+                        💾 Surveillance Mémoire
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-400 text-sm">Utilisation actuelle</span>
+                            <span class="text-slate-100 font-medium" x-text="(memoryStats.current_usage?.process_memory_mb || 0).toFixed(1) + 'MB'">0MB</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-400 text-sm">Pic d'usage</span>
+                            <span class="text-slate-100 font-medium" x-text="(memoryStats.statistics?.peak_usage_mb || 0).toFixed(1) + 'MB'">0MB</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-400 text-sm">Tendance</span>
+                            <span class="text-blue-400 font-medium" x-text="memoryStats.statistics?.usage_trend || 'stable'">stable</span>
+                        </div>
+                        <div class="flex items-center space-x-2 mt-3">
+                            <div class="w-2 h-2 rounded-full" 
+                                 :class="memoryStats.thresholds?.warning_reached ? 'bg-yellow-400 animate-pulse' : memoryStats.thresholds?.critical_reached ? 'bg-red-400 animate-pulse' : 'bg-green-400'"></div>
+                            <span class="text-xs" 
+                                  :class="memoryStats.thresholds?.warning_reached ? 'text-yellow-400' : memoryStats.thresholds?.critical_reached ? 'text-red-400' : 'text-green-400'"
+                                  x-text="memoryStats.thresholds?.critical_reached ? 'Critique' : memoryStats.thresholds?.warning_reached ? 'Attention' : 'Normal'">Normal</span>
+                        </div>
                     </div>
-                    <div class="text-purple-400 text-3xl">🧠</div>
                 </div>
             </div>
         </div>
 
         <!-- Main Grid -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <!-- Scraping Form -->
+            <!-- Enhanced Scraping Form -->
             <div class="glass rounded-xl p-6">
                 <h2 class="text-xl font-semibold text-slate-100 mb-6 flex items-center">
-                    🕸️ Nouveau Scraping
+                    🕸️ Nouveau Scraping <span class="ml-2 text-sm bg-purple-500/20 text-purple-400 px-2 py-1 rounded">v0.2.0</span>
                 </h2>
                 
                 <form @submit.prevent="submitScraping" class="space-y-6">
-                    <!-- URL Input -->
+                    <!-- URL Input with Validation -->
                     <div>
                         <label class="block text-sm font-medium text-slate-300 mb-2">URL à scraper</label>
-                        <input 
-                            type="url" 
-                            x-model="form.url"
-                            placeholder="https://example.com/article"
-                            class="w-full bg-slate-800/50 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                            required
-                        />
+                        <div class="relative">
+                            <input 
+                                type="url" 
+                                x-model="form.url"
+                                @input="validateUrl"
+                                placeholder="https://example.com/article"
+                                class="w-full bg-slate-800/50 border border-slate-600 rounded-lg px-4 py-3 pr-12 text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                :class="urlValidation.isValid ? 'border-green-500/50' : urlValidation.error ? 'border-red-500/50' : ''"
+                                required
+                            />
+                            <div class="absolute right-3 top-1/2 transform -translate-y-1/2">
+                                <div x-show="urlValidation.isValid" class="text-green-400">✓</div>
+                                <div x-show="urlValidation.error && form.url" class="text-red-400">✗</div>
+                            </div>
+                        </div>
+                        <p x-show="urlValidation.error && form.url" class="text-red-400 text-xs mt-1" x-text="urlValidation.error"></p>
                     </div>
 
-                    <!-- Options -->
+                    <!-- Advanced Options Grid -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-slate-300 mb-2">Format de sortie</label>
                             <select 
                                 x-model="form.output_format"
-                                class="w-full bg-slate-800/50 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                class="w-full bg-slate-800/50 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                             >
-                                <option value="markdown">📝 Markdown</option>
-                                <option value="text">📄 Text</option>
-                                <option value="json">🔗 JSON</option>
-                                <option value="html">🌐 HTML</option>
+                                <option value="markdown">📝 Markdown (optimisé)</option>
+                                <option value="text">📄 Text (nettoyé)</option>
+                                <option value="json">🔗 JSON (structuré)</option>
+                                <option value="html">🌐 HTML (optimisé)</option>
                             </select>
                         </div>
-                        <div class="flex items-center space-x-4 pt-8">
-                            <label class="flex items-center space-x-2 cursor-pointer">
-                                <input 
-                                    type="checkbox" 
-                                    x-model="form.use_llm"
-                                    class="w-4 h-4 text-indigo-600 bg-slate-800 border-slate-600 rounded focus:ring-indigo-500"
-                                />
-                                <span class="text-sm text-slate-300">Utiliser LLM</span>
-                            </label>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Options avancées</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center space-x-2 cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        x-model="form.use_llm"
+                                        class="w-4 h-4 text-indigo-600 bg-slate-800 border-slate-600 rounded focus:ring-indigo-500"
+                                    />
+                                    <span class="text-sm text-slate-300">Utiliser LLM 🧠</span>
+                                </label>
+                                <label class="flex items-center space-x-2 cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        x-model="form.use_cache"
+                                        class="w-4 h-4 text-indigo-600 bg-slate-800 border-slate-600 rounded focus:ring-indigo-500"
+                                    />
+                                    <span class="text-sm text-slate-300">Cache intelligent 🗄️</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Custom Instructions -->
+                    <!-- Custom Instructions with Examples -->
                     <div>
-                        <label class="block text-sm font-medium text-slate-300 mb-2">Instructions personnalisées (optionnel)</label>
-                        <textarea 
-                            x-model="form.custom_instructions"
-                            placeholder="Ex: Extraire uniquement les titres et les résumés..."
-                            rows="3"
-                            class="w-full bg-slate-800/50 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-                        ></textarea>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">
+                            Instructions personnalisées 
+                            <span class="text-xs text-slate-500">(optionnel)</span>
+                        </label>
+                        <div class="relative">
+                            <textarea 
+                                x-model="form.custom_instructions"
+                                placeholder="Ex: Extraire uniquement les titres et les résumés..."
+                                rows="3"
+                                class="w-full bg-slate-800/50 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none transition-all"
+                            ></textarea>
+                            <div class="absolute bottom-2 right-2 text-xs text-slate-500" 
+                                 x-text="form.custom_instructions.length + '/500'"></div>
+                        </div>
+                        <!-- Quick Examples -->
+                        <div class="mt-2 flex flex-wrap gap-2">
+                            <button type="button" @click="form.custom_instructions = 'Extraire uniquement les articles principaux'" 
+                                    class="text-xs bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 px-2 py-1 rounded transition-colors">
+                                Articles
+                            </button>
+                            <button type="button" @click="form.custom_instructions = 'Extraire les prix et descriptions de produits'" 
+                                    class="text-xs bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 px-2 py-1 rounded transition-colors">
+                                E-commerce
+                            </button>
+                            <button type="button" @click="form.custom_instructions = 'Créer un résumé structuré en français'" 
+                                    class="text-xs bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 px-2 py-1 rounded transition-colors">
+                                Résumé
+                            </button>
+                        </div>
                     </div>
 
-                    <!-- Submit Button -->
+                    <!-- Enhanced Submit Button -->
                     <button 
                         type="submit"
-                        :disabled="isLoading"
-                        class="w-full gradient-primary text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-indigo-500/25"
+                        :disabled="isLoading || !urlValidation.isValid"
+                        class="w-full gradient-primary text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-indigo-500/25 hover:scale-105"
                     >
-                        <span x-show="!isLoading">🚀 Lancer le scraping</span>
+                        <span x-show="!isLoading" class="flex items-center justify-center space-x-2">
+                            <span>🚀 Lancer le scraping</span>
+                            <span x-show="form.use_cache" class="text-xs opacity-75">+ Cache</span>
+                            <span x-show="form.use_llm" class="text-xs opacity-75">+ LLM</span>
+                        </span>
                         <span x-show="isLoading" class="flex items-center justify-center space-x-2">
                             <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
@@ -163,26 +297,40 @@
                         </span>
                     </button>
 
-                    <!-- Progress Bar -->
-                    <div x-show="isLoading" class="mt-4">
-                        <div class="bg-slate-700 rounded-full h-2">
-                            <div class="gradient-primary h-2 rounded-full animate-pulse-slow" style="width: 75%"></div>
+                    <!-- Enhanced Progress Bar -->
+                    <div x-show="isLoading" x-transition class="mt-4 space-y-2">
+                        <div class="bg-slate-700 rounded-full h-3 overflow-hidden">
+                            <div class="gradient-primary h-full rounded-full transition-all duration-1000 animate-pulse" 
+                                 :style="`width: ${progress}%`"></div>
                         </div>
-                        <p class="text-sm text-slate-400 mt-2">Extraction du contenu en cours...</p>
+                        <div class="flex justify-between text-xs text-slate-400">
+                            <span x-text="progressMessage">Initialisation...</span>
+                            <span x-text="progress + '%'">0%</span>
+                        </div>
                     </div>
                 </form>
 
-                <!-- Notification -->
+                <!-- Enhanced Notification -->
                 <div x-show="notification.show" x-transition class="mt-4">
                     <div 
                         :class="{
                             'bg-green-500/20 border-green-500/50 text-green-400': notification.type === 'success',
                             'bg-red-500/20 border-red-500/50 text-red-400': notification.type === 'error',
-                            'bg-blue-500/20 border-blue-500/50 text-blue-400': notification.type === 'info'
+                            'bg-blue-500/20 border-blue-500/50 text-blue-400': notification.type === 'info',
+                            'bg-yellow-500/20 border-yellow-500/50 text-yellow-400': notification.type === 'warning'
                         }"
-                        class="border rounded-lg p-4"
+                        class="border rounded-lg p-4 flex items-start space-x-3"
                     >
-                        <p x-text="notification.message"></p>
+                        <div class="flex-shrink-0 text-lg">
+                            <span x-show="notification.type === 'success'">✅</span>
+                            <span x-show="notification.type === 'error'">❌</span>
+                            <span x-show="notification.type === 'info'">ℹ️</span>
+                            <span x-show="notification.type === 'warning'">⚠️</span>
+                        </div>
+                        <div class="flex-1">
+                            <p class="font-medium" x-text="notification.message"></p>
+                            <p x-show="notification.details" class="text-sm opacity-75 mt-1" x-text="notification.details"></p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -271,23 +419,39 @@
                     url: '',
                     output_format: 'markdown',
                     use_llm: true,
+                    use_cache: true,
                     custom_instructions: ''
                 },
                 
                 // App state
                 isLoading: false,
+                progress: 0,
+                progressMessage: 'Initialisation...',
                 tasks: [],
                 stats: {
                     total_tasks: 0,
                     active_tasks: 0,
                     success_rate: 0,
-                    ollama_status: 'unknown'
+                    ollama_status: 'unknown',
+                    browser_pool: {}
+                },
+                
+                // Performance stats v0.2.0
+                browserStats: {},
+                cacheStats: {},
+                memoryStats: {},
+                
+                // URL validation
+                urlValidation: {
+                    isValid: false,
+                    error: null
                 },
                 
                 // UI state
                 notification: {
                     show: false,
                     message: '',
+                    details: '',
                     type: 'info'
                 },
                 modal: {
@@ -296,8 +460,38 @@
                 },
 
                 async init() {
-                    await this.loadStats();
+                    await this.loadAllStats();
                     await this.loadTasks();
+                    // Auto-refresh stats every 30 seconds
+                    setInterval(() => this.loadAllStats(), 30000);
+                },
+
+                async loadAllStats() {
+                    await Promise.all([
+                        this.loadStats(),
+                        this.loadBrowserStats(),
+                        this.loadCacheStats(),
+                        this.loadMemoryStats()
+                    ]);
+                },
+
+                validateUrl() {
+                    try {
+                        if (!this.form.url) {
+                            this.urlValidation = { isValid: false, error: null };
+                            return;
+                        }
+                        
+                        const url = new URL(this.form.url);
+                        if (!['http:', 'https:'].includes(url.protocol)) {
+                            this.urlValidation = { isValid: false, error: 'Protocol non supporté' };
+                            return;
+                        }
+                        
+                        this.urlValidation = { isValid: true, error: null };
+                    } catch (e) {
+                        this.urlValidation = { isValid: false, error: 'URL invalide' };
+                    }
                 },
 
                 async submitScraping() {
@@ -363,6 +557,48 @@
                     }
                 },
 
+                async loadBrowserStats() {
+                    try {
+                        const response = await fetch('/stats/browser');
+                        const result = await response.json();
+                        
+                        if (response.ok) {
+                            this.browserStats = result.data;
+                        }
+                    } catch (error) {
+                        console.error('Error loading browser stats:', error);
+                        this.browserStats = {};
+                    }
+                },
+
+                async loadCacheStats() {
+                    try {
+                        const response = await fetch('/stats/cache');
+                        const result = await response.json();
+                        
+                        if (response.ok) {
+                            this.cacheStats = result.data;
+                        }
+                    } catch (error) {
+                        console.error('Error loading cache stats:', error);
+                        this.cacheStats = {};
+                    }
+                },
+
+                async loadMemoryStats() {
+                    try {
+                        const response = await fetch('/stats/memory');
+                        const result = await response.json();
+                        
+                        if (response.ok) {
+                            this.memoryStats = result.data;
+                        }
+                    } catch (error) {
+                        console.error('Error loading memory stats:', error);
+                        this.memoryStats = {};
+                    }
+                },
+
                 async viewResult(taskId) {
                     try {
                         const response = await fetch(`/scrape/${taskId}/result`);
@@ -380,17 +616,18 @@
                     }
                 },
 
-                showNotification(message, type = 'info') {
+                showNotification(message, type = 'info', details = '') {
                     this.notification = {
                         show: true,
                         message,
+                        details,
                         type
                     };
                     
-                    // Auto-hide after 5 seconds
+                    // Auto-hide after 5 seconds (or 8 seconds if there are details)
                     setTimeout(() => {
                         this.hideNotification();
-                    }, 5000);
+                    }, details ? 8000 : 5000);
                 },
 
                 hideNotification() {
