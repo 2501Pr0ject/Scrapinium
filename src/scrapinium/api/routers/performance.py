@@ -168,8 +168,8 @@ async def get_optimization_history() -> Dict[str, Any]:
                 "statistics": {
                     "total_optimizations": total_optimizations,
                     "recent_optimizations_24h": len(recent_optimizations),
-                    "most_frequent_rules": self._get_most_frequent_rules(history),
-                    "average_improvement": self._calculate_average_improvement(history)
+                    "most_frequent_rules": _get_most_frequent_rules(history),
+                    "average_improvement": _calculate_average_improvement(history)
                 }
             },
             "message": f"{total_optimizations} optimisations dans l'historique"
@@ -344,7 +344,7 @@ async def get_performance_bottlenecks() -> Dict[str, Any]:
                 "all_bottlenecks": report.bottlenecks,
                 "memory_hotspots": report.memory_hotspots,
                 "optimization_suggestions": report.optimization_suggestions,
-                "performance_score": self._calculate_performance_score(report)
+                "performance_score": _calculate_performance_score(report)
             },
             "message": f"{len(report.bottlenecks)} goulots d'étranglement détectés"
         }
