@@ -671,6 +671,11 @@ async def get_browser_stats():
     return await browser_manager.get_stats()
 
 
+def get_browser_pool():
+    """Retourne l'instance du gestionnaire de navigateurs."""
+    return browser_manager
+
+
 # Fonction utilitaire pour scraper rapidement une URL
 async def quick_scrape(url: str, **options) -> dict[str, Any]:
     """

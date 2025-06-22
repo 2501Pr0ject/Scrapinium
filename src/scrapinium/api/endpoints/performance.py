@@ -27,7 +27,7 @@ async def get_optimizer():
     global optimizer
     if optimizer is None:
         cache_manager = await get_cache_manager()
-        browser_pool = await get_browser_pool()
+        browser_pool = get_browser_pool()
         memory_monitor = get_memory_monitor()
         
         optimizer = PerformanceOptimizer(
@@ -251,8 +251,8 @@ async def run_scraping_benchmark(
 
 @router.post("/benchmark/cache")
 async def run_cache_benchmark(
-    operations: int = 1000,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    operations: int = 1000
 ) -> Dict[str, Any]:
     """
     Lance un benchmark du système de cache.

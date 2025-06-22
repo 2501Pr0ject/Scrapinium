@@ -1,0 +1,43 @@
+/* Scrapinium - Styles principaux */
+body {
+    margin: 0;
+    padding: 0;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height: 100vh;
+}
+
+.glass {
+    background: rgba(30, 41, 59, 0.8);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(100, 116, 139, 0.3);
+}
+
+/* Assurer que le contenu est visible */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Debug: rendre visible le contenu en cas de problème */
+body * {
+    color: inherit !important;
+}
+
+/* Fallback si Tailwind ne charge pas */
+.btn {
+    padding: 10px 20px;
+    border-radius: 6px;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+.card {
+    background: rgba(30, 41, 59, 0.8);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 10px 0;
+}

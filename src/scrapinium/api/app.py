@@ -91,10 +91,14 @@ def create_app() -> FastAPI:
     app.middleware("http")(rate_limit_middleware)
     
     # 3. CORS sécurisé (utilise la config de security_headers)
-    cors_middleware = security_headers.create_cors_middleware()
     app.add_middleware(
-        type(cors_middleware),
-        **cors_middleware.__dict__
+        CORSMiddleware,
+        allow_origins=security_headers.allowed_origins,
+        allow_credentials=False,
+        allow_methods=security_headers.allowed_methods,
+        allow_headers=security_headers.allowed_headers,
+        expose_headers=security_headers.exposed_headers,
+        max_age=3600 if security_headers.production_mode else 300,
     )
 
     # Routes principales
@@ -120,7 +124,7 @@ def setup_routes(app: FastAPI):
     async def root(request: Request):
         """Interface web principale."""
         return templates.TemplateResponse(
-            "index.html", 
+            "simple.html", 
             {"request": request}
         )
     
