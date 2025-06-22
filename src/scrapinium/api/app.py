@@ -30,12 +30,22 @@ from ..security.config_security import security_manager
 
 logger = get_logger("api")
 
-# Stockage en mémoire des tâches (remplacé par BDD en production)
-active_tasks: dict[str, dict[str, Any]] = {}
-completed_tasks: list[dict[str, Any]] = []
+# Gestionnaires pour remplacer les variables globales
+from .task_manager import get_task_manager
+from .ml_manager import get_ml_manager
+from .exception_handler import setup_exception_handlers
 
-# Instance globale du pipeline ML
-ml_pipeline: MLPipeline | None = None
+
+def get_ml_pipeline_or_raise():
+    """Helper pour récupérer le pipeline ML ou lever une exception."""
+    ml_manager = get_ml_manager()
+    ml_pipeline_instance = ml_manager.get_pipeline()
+    
+    if not ml_pipeline_instance:
+        error_msg = ml_manager.get_initialization_error() or "Pipeline ML non disponible"
+        raise HTTPException(status_code=503, detail=error_msg)
+    
+    return ml_pipeline_instance
 
 
 @asynccontextmanager
@@ -62,12 +72,8 @@ async def lifespan(app: FastAPI):
         logger.warning(f"⚠️ Erreur de connexion Ollama: {e}")
 
     # Initialiser le pipeline ML
-    try:
-        global ml_pipeline
-        ml_pipeline = MLPipeline()
-        logger.info("✅ Pipeline ML initialisé")
-    except Exception as e:
-        logger.error(f"❌ Erreur d'initialisation pipeline ML: {e}")
+    ml_manager = get_ml_manager()
+    await ml_manager.initialize()
 
     logger.info("🎯 API Scrapinium prête!")
 
@@ -76,7 +82,13 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("🛑 Arrêt de l'API Scrapinium...")
 
-    # Nettoyer les ressources
+    # Nettoyer les ressources ML
+    try:
+        await ml_manager.shutdown()
+    except Exception as e:
+        logger.error(f"Erreur lors de l'arrêt du ML manager: {e}")
+
+    # Nettoyer les ressources de scraping
     try:
         await scraping_service.cleanup()
         await ollama_client.cleanup()
@@ -117,6 +129,9 @@ def create_app() -> FastAPI:
 
     # Routes principales
     setup_routes(app)
+    
+    # Configuration des gestionnaires d'exceptions
+    setup_exception_handlers(app)
 
     return app
 
@@ -178,12 +193,17 @@ def setup_routes(app: FastAPI):
 
         # Vérifier le pipeline ML
         try:
-            if ml_pipeline:
+            ml_manager = get_ml_manager()
+            if ml_manager.is_available():
                 health_status["ml_pipeline"] = "healthy"
             else:
+                error_msg = ml_manager.get_initialization_error()
                 health_status["ml_pipeline"] = "unavailable"
-        except Exception:
+                if error_msg:
+                    health_status["ml_pipeline_error"] = error_msg
+        except Exception as e:
             health_status["ml_pipeline"] = "error"
+            health_status["ml_pipeline_error"] = str(e)
 
         return health_status
 
@@ -203,15 +223,14 @@ def setup_routes(app: FastAPI):
                 "url": str(task_data.url),
                 "output_format": task_data.output_format,
                 "llm_provider": task_data.llm_provider,
-                "status": "pending",
                 "progress": 0,
                 "message": "Tâche créée",
-                "created_at": "now",  # TODO: timestamp réel
                 "result": None,
                 "error": None,
             }
 
-            active_tasks[task_id] = task_entry
+            task_manager = get_task_manager()
+            task_manager.add_task(task_id, task_entry)
 
             # Lancer la tâche en arrière-plan
             background_tasks.add_task(
@@ -237,16 +256,20 @@ def setup_routes(app: FastAPI):
     @app.get("/scrape/{task_id}")
     async def get_task_status(task_id: str):
         """Récupère le statut d'une tâche."""
+        task_manager = get_task_manager()
+        
         # Chercher dans les tâches actives
-        if task_id in active_tasks:
+        active_task = task_manager.get_task(task_id)
+        if active_task:
             return APIResponse.success_response(
-                data=active_tasks[task_id],
+                data=active_task,
                 message="Statut de la tâche récupéré",
             )
 
         # Chercher dans les tâches terminées
+        completed_tasks_list = task_manager.get_completed_tasks()
         completed_task = next(
-            (task for task in completed_tasks if task["id"] == task_id), None
+            (task for task in completed_tasks_list if task["id"] == task_id), None
         )
 
         if completed_task:
@@ -261,8 +284,10 @@ def setup_routes(app: FastAPI):
     async def get_task_result(task_id: str):
         """Récupère le résultat d'une tâche terminée."""
         # Chercher dans les tâches terminées
+        task_manager = get_task_manager()
+        completed_tasks_list = task_manager.get_completed_tasks()
         completed_task = next(
-            (task for task in completed_tasks if task["id"] == task_id), None
+            (task for task in completed_tasks_list if task["id"] == task_id), None
         )
 
         if not completed_task:
@@ -290,13 +315,14 @@ def setup_routes(app: FastAPI):
     @app.get("/tasks")
     async def list_tasks(limit: int = 50):
         """Liste toutes les tâches."""
+        task_manager = get_task_manager()
         all_tasks = []
 
         # Ajouter les tâches actives
-        all_tasks.extend(list(active_tasks.values()))
+        all_tasks.extend(list(task_manager.get_active_tasks().values()))
 
         # Ajouter les tâches terminées
-        all_tasks.extend(completed_tasks)
+        all_tasks.extend(task_manager.get_completed_tasks())
 
         # Trier par date de création (plus récent en premier)
         # all_tasks.sort(key=lambda x: x["created_at"], reverse=True)
@@ -308,8 +334,8 @@ def setup_routes(app: FastAPI):
             data={
                 "tasks": limited_tasks,
                 "total": len(all_tasks),
-                "active": len(active_tasks),
-                "completed": len(completed_tasks),
+                "active": len(task_manager.get_active_tasks()),
+                "completed": len(task_manager.get_completed_tasks()),
             },
             message=f"Liste de {len(limited_tasks)} tâches récupérée",
         )
@@ -317,18 +343,19 @@ def setup_routes(app: FastAPI):
     @app.delete("/scrape/{task_id}")
     async def cancel_task(task_id: str):
         """Annule une tâche en cours."""
-        if task_id not in active_tasks:
+        task_manager = get_task_manager()
+        
+        if not task_manager.get_task(task_id):
             raise HTTPException(
                 status_code=404, detail=f"Tâche {task_id} non trouvée ou déjà terminée"
             )
 
-        # Marquer comme annulée
-        active_tasks[task_id]["status"] = "cancelled"
-        active_tasks[task_id]["message"] = "Tâche annulée par l'utilisateur"
-
-        # Déplacer vers les tâches terminées
-        cancelled_task = active_tasks.pop(task_id)
-        completed_tasks.append(cancelled_task)
+        # Marquer comme annulée et la déplacer
+        success = task_manager.fail_task(task_id, "Tâche annulée par l'utilisateur")
+        if not success:
+            raise HTTPException(
+                status_code=400, detail="Impossible d'annuler la tâche"
+            )
 
         logger.info(f"🚫 Tâche {task_id} annulée")
 
@@ -340,13 +367,13 @@ def setup_routes(app: FastAPI):
     @app.get("/stats")
     async def get_stats():
         """Statistiques globales avec monitoring du pool de navigateurs."""
-        total_tasks = len(active_tasks) + len(completed_tasks)
-        completed_count = len(
-            [t for t in completed_tasks if t["status"] == "completed"]
-        )
-        failed_count = len([t for t in completed_tasks if t["status"] == "failed"])
-
-        success_rate = (completed_count / total_tasks * 100) if total_tasks > 0 else 0
+        task_manager = get_task_manager()
+        task_stats = task_manager.get_task_stats()
+        
+        total_tasks = task_stats["active_tasks"] + task_stats["completed_tasks"]
+        completed_count = task_stats["successful_tasks"]
+        failed_count = task_stats["failed_tasks"]
+        success_rate = task_stats["success_rate"]
         
         # Récupérer les statistiques du pool de navigateurs
         browser_stats = await get_browser_stats()
@@ -354,7 +381,7 @@ def setup_routes(app: FastAPI):
         return APIResponse.success_response(
             data={
                 "total_tasks": total_tasks,
-                "active_tasks": len(active_tasks),
+                "active_tasks": task_stats["active_tasks"],
                 "completed_tasks": completed_count,
                 "failed_tasks": failed_count,
                 "success_rate": round(success_rate, 1),
@@ -623,8 +650,12 @@ def setup_routes(app: FastAPI):
                 import json
                 try:
                     payload = json.loads(body)
-                except:
-                    payload = {"raw_data": body.decode()}
+                except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                    logger.warning(f"Failed to parse request body as JSON: {e}")
+                    try:
+                        payload = {"raw_data": body.decode('utf-8')}
+                    except UnicodeDecodeError:
+                        payload = {"raw_data": body.hex()}
             else:
                 payload = {}
             
@@ -703,8 +734,7 @@ def setup_routes(app: FastAPI):
     async def ml_analyze_page(request: dict):
         """Analyse ML complète d'une page web."""
         try:
-            if not ml_pipeline:
-                raise HTTPException(status_code=503, detail="Pipeline ML non disponible")
+            ml_pipeline = get_ml_pipeline_or_raise()
             
             # Validation des inputs
             if not request.get("html") or not request.get("url"):
@@ -766,8 +796,7 @@ def setup_routes(app: FastAPI):
     async def ml_classify_content(request: dict):
         """Classification de contenu uniquement."""
         try:
-            if not ml_pipeline:
-                raise HTTPException(status_code=503, detail="Pipeline ML non disponible")
+            ml_pipeline = get_ml_pipeline_or_raise()
             
             if not request.get("html") or not request.get("url"):
                 raise HTTPException(status_code=400, detail="HTML et URL requis")
@@ -805,8 +834,7 @@ def setup_routes(app: FastAPI):
     async def ml_detect_bot_challenges(request: dict):
         """Détection des défis anti-bot."""
         try:
-            if not ml_pipeline:
-                raise HTTPException(status_code=503, detail="Pipeline ML non disponible")
+            ml_pipeline = get_ml_pipeline_or_raise()
             
             if not request.get("html") or not request.get("url"):
                 raise HTTPException(status_code=400, detail="HTML et URL requis")
@@ -846,8 +874,7 @@ def setup_routes(app: FastAPI):
     async def ml_get_statistics():
         """Statistiques du pipeline ML."""
         try:
-            if not ml_pipeline:
-                raise HTTPException(status_code=503, detail="Pipeline ML non disponible")
+            ml_pipeline = get_ml_pipeline_or_raise()
             
             stats = ml_pipeline.get_performance_metrics()
             
@@ -869,8 +896,7 @@ def setup_routes(app: FastAPI):
     async def ml_get_cache_statistics():
         """Statistiques du cache ML."""
         try:
-            if not ml_pipeline:
-                raise HTTPException(status_code=503, detail="Pipeline ML non disponible")
+            ml_pipeline = get_ml_pipeline_or_raise()
             
             cache_stats = ml_pipeline.get_cache_stats()
             
@@ -892,8 +918,7 @@ def setup_routes(app: FastAPI):
     async def ml_clear_cache():
         """Vider le cache ML."""
         try:
-            if not ml_pipeline:
-                raise HTTPException(status_code=503, detail="Pipeline ML non disponible")
+            ml_pipeline = get_ml_pipeline_or_raise()
             
             result = ml_pipeline.clear_cache()
             
@@ -915,8 +940,7 @@ def setup_routes(app: FastAPI):
     async def ml_optimize_cache():
         """Optimiser le cache ML (supprimer les entrées expirées)."""
         try:
-            if not ml_pipeline:
-                raise HTTPException(status_code=503, detail="Pipeline ML non disponible")
+            ml_pipeline = get_ml_pipeline_or_raise()
             
             result = ml_pipeline.optimize_cache()
             
@@ -940,17 +964,22 @@ async def execute_scraping_task(task_id: str, task_data: ScrapingTaskCreate):
     try:
         logger.info(f"▶️ Début d'exécution de la tâche {task_id}")
 
+        task_manager = get_task_manager()
+        
         # Callback pour mettre à jour le progrès
         async def progress_callback(tid: str, progress: float, message: str):
-            if tid in active_tasks:
-                active_tasks[tid]["progress"] = progress
-                active_tasks[tid]["message"] = message
-                active_tasks[tid]["status"] = "running"
-                logger.debug(f"📊 Tâche {tid}: {progress}% - {message}")
+            task_manager.update_task(tid, {
+                "progress": progress,
+                "message": message,
+                "status": "running"
+            })
+            logger.debug(f"📊 Tâche {tid}: {progress}% - {message}")
 
         # Marquer comme en cours
-        active_tasks[task_id]["status"] = "running"
-        active_tasks[task_id]["message"] = "Scraping en cours..."
+        task_manager.update_task(task_id, {
+            "status": "running",
+            "message": "Scraping en cours..."
+        })
 
         # Exécuter le scraping
         result = await scraping_service.scrape_url(
@@ -961,10 +990,12 @@ async def execute_scraping_task(task_id: str, task_data: ScrapingTaskCreate):
 
         # Analyse ML si le scraping a réussi et que ML est disponible
         ml_analysis = None
-        if result["status"] == "completed" and ml_pipeline and result.get("html_content"):
+        ml_manager = get_ml_manager()
+        if result["status"] == "completed" and ml_manager.is_available() and result.get("html_content"):
             try:
                 await progress_callback(task_id, 90, "Analyse ML en cours...")
                 
+                ml_pipeline = ml_manager.get_pipeline()
                 ml_analysis = await ml_pipeline.analyze_page(
                     html=result["html_content"],
                     url=str(task_data.url),
@@ -1011,55 +1042,29 @@ async def execute_scraping_task(task_id: str, task_data: ScrapingTaskCreate):
                     "recommendations": ml_analysis.recommendations
                 }
             
-            completed_task = {
-                **active_tasks[task_id],
-                "status": "completed",
+            # Marquer la tâche comme terminée
+            task_manager.complete_task(task_id, {
                 "progress": 100,
                 "message": "Terminé avec succès" + (" + analyse ML" if ml_analysis else ""),
                 "result": result["structured_content"],
                 "metadata": task_metadata,
                 "execution_time_ms": result.get("execution_time_ms", 0),
                 "tokens_used": result.get("tokens_used", 0),
-            }
+            })
 
             logger.info(f"✅ Tâche {task_id} terminée avec succès")
 
         else:
-            # Échec
-            completed_task = {
-                **active_tasks[task_id],
-                "status": "failed",
-                "progress": 0,
-                "message": "Échec du scraping",
-                "error": result.get("error_message", "Erreur inconnue"),
-                "result": None,
-            }
-
-            logger.error(f"❌ Tâche {task_id} échouée: {result.get('error_message')}")
-
-        # Déplacer vers les tâches terminées
-        active_tasks.pop(task_id, None)
-        completed_tasks.append(completed_task)
-
-        # Limiter le nombre de tâches terminées en mémoire
-        if len(completed_tasks) > 100:
-            completed_tasks.pop(0)  # Supprimer la plus ancienne
+            # Échec - marquer comme échouée
+            error_msg = result.get("error_message", "Erreur inconnue")
+            task_manager.fail_task(task_id, error_msg)
+            logger.error(f"❌ Tâche {task_id} échouée: {error_msg}")
 
     except Exception as e:
         logger.error(f"💥 Erreur critique dans la tâche {task_id}: {e}")
 
         # Marquer comme échouée
-        failed_task = {
-            **active_tasks.get(task_id, {}),
-            "status": "failed",
-            "progress": 0,
-            "message": "Erreur système",
-            "error": str(e),
-            "result": None,
-        }
-
-        active_tasks.pop(task_id, None)
-        completed_tasks.append(failed_task)
+        task_manager.fail_task(task_id, f"Erreur système: {str(e)}")
 
 
 # Créer l'instance de l'application pour uvicorn
