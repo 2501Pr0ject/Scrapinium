@@ -189,7 +189,7 @@ class SecurityHeaders:
             response.headers["X-XSS-Protection"] = "1; mode=block"
         
         # Headers de sécurité pour les endpoints sensibles
-        path = getattr(request, "url", {}).get("path", "")
+        path = str(request.url.path) if hasattr(request, 'url') else ""
         
         if path.startswith("/maintenance"):
             response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
