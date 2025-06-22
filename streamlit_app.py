@@ -4,6 +4,7 @@ import streamlit as st
 import requests
 import json
 import time
+import io
 from datetime import datetime
 from typing import Dict, Any
 
@@ -68,6 +69,92 @@ def call_api(endpoint: str, method: str = "GET", data: Dict[str, Any] = None) ->
             
     except requests.exceptions.RequestException as e:
         return {"error": f"Erreur de connexion: {str(e)}"}
+
+
+def create_download_files(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Crée les fichiers de téléchargement dans différents formats."""
+    content = data.get('content', '')
+    url = data.get('url', 'unknown')
+    metadata = data.get('metadata', {})
+    
+    # Nettoyer le nom de fichier
+    filename_base = url.replace('https://', '').replace('http://', '').replace('/', '_').replace('?', '_')[:50]
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    downloads = {}
+    
+    # 1. Fichier texte brut
+    txt_content = f"""SCRAPINIUM - Résultat d'extraction
+=====================================
+
+URL: {url}
+Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+Format: {data.get('output_format', 'text')}
+Mots: {metadata.get('word_count', 'N/A')}
+Taille: {metadata.get('content_size', 'N/A')} bytes
+
+CONTENU:
+--------
+{content}
+"""
+    downloads['txt'] = {
+        'content': txt_content,
+        'filename': f"scrapinium_{filename_base}_{timestamp}.txt",
+        'mime': 'text/plain'
+    }
+    
+    # 2. Fichier JSON structuré
+    json_content = {
+        "scrapinium_export": {
+            "url": url,
+            "timestamp": datetime.now().isoformat(),
+            "format": data.get('output_format', 'text'),
+            "metadata": metadata,
+            "content": content
+        }
+    }
+    downloads['json'] = {
+        'content': json.dumps(json_content, indent=2, ensure_ascii=False),
+        'filename': f"scrapinium_{filename_base}_{timestamp}.json",
+        'mime': 'application/json'
+    }
+    
+    # 3. Fichier Markdown
+    md_content = f"""# Scrapinium - Extraction de {url}
+
+**URL:** {url}  
+**Date:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}  
+**Format:** {data.get('output_format', 'text')}  
+**Mots:** {metadata.get('word_count', 'N/A')}  
+**Taille:** {metadata.get('content_size', 'N/A')} bytes  
+
+---
+
+## Contenu extrait
+
+{content}
+
+---
+
+*Généré par Scrapinium - Web Scraping Intelligent*
+"""
+    downloads['md'] = {
+        'content': md_content,
+        'filename': f"scrapinium_{filename_base}_{timestamp}.md",
+        'mime': 'text/markdown'
+    }
+    
+    # 4. Fichier CSV (pour les données structurées)
+    csv_content = f"""URL,Date,Format,Mots,Taille,Contenu
+"{url}","{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}","{data.get('output_format', 'text')}","{metadata.get('word_count', 'N/A')}","{metadata.get('content_size', 'N/A')}","{content.replace('"', '""')}"
+"""
+    downloads['csv'] = {
+        'content': csv_content,
+        'filename': f"scrapinium_{filename_base}_{timestamp}.csv",
+        'mime': 'text/csv'
+    }
+    
+    return downloads
 
 def main():
     """Interface principale."""
@@ -197,6 +284,48 @@ def main():
                                                     content[:2000] + "..." if len(content) > 2000 else content,
                                                     height=200
                                                 )
+                                                
+                                                # Boutons de téléchargement
+                                                st.subheader("💾 Télécharger les résultats")
+                                                downloads = create_download_files(data)
+                                                
+                                                col_dl1, col_dl2, col_dl3, col_dl4 = st.columns(4)
+                                                
+                                                with col_dl1:
+                                                    st.download_button(
+                                                        "📄 TXT",
+                                                        data=downloads['txt']['content'],
+                                                        file_name=downloads['txt']['filename'],
+                                                        mime=downloads['txt']['mime'],
+                                                        use_container_width=True
+                                                    )
+                                                
+                                                with col_dl2:
+                                                    st.download_button(
+                                                        "📊 JSON",
+                                                        data=downloads['json']['content'],
+                                                        file_name=downloads['json']['filename'],
+                                                        mime=downloads['json']['mime'],
+                                                        use_container_width=True
+                                                    )
+                                                
+                                                with col_dl3:
+                                                    st.download_button(
+                                                        "📝 MD",
+                                                        data=downloads['md']['content'],
+                                                        file_name=downloads['md']['filename'],
+                                                        mime=downloads['md']['mime'],
+                                                        use_container_width=True
+                                                    )
+                                                
+                                                with col_dl4:
+                                                    st.download_button(
+                                                        "📋 CSV",
+                                                        data=downloads['csv']['content'],
+                                                        file_name=downloads['csv']['filename'],
+                                                        mime=downloads['csv']['mime'],
+                                                        use_container_width=True
+                                                    )
                                     else:
                                         st.warning(f"⏳ Tâche en cours... Réessayez dans quelques secondes")
                             
@@ -290,6 +419,51 @@ def main():
                                             height=150,
                                             key=f"content_{i}"
                                         )
+                                        
+                                        # Boutons de téléchargement pour l'historique
+                                        downloads = create_download_files(data)
+                                        
+                                        col_h1, col_h2, col_h3, col_h4 = st.columns(4)
+                                        
+                                        with col_h1:
+                                            st.download_button(
+                                                "📄 TXT",
+                                                data=downloads['txt']['content'],
+                                                file_name=downloads['txt']['filename'],
+                                                mime=downloads['txt']['mime'],
+                                                key=f"txt_{i}",
+                                                use_container_width=True
+                                            )
+                                        
+                                        with col_h2:
+                                            st.download_button(
+                                                "📊 JSON",
+                                                data=downloads['json']['content'],
+                                                file_name=downloads['json']['filename'],
+                                                mime=downloads['json']['mime'],
+                                                key=f"json_{i}",
+                                                use_container_width=True
+                                            )
+                                        
+                                        with col_h3:
+                                            st.download_button(
+                                                "📝 MD",
+                                                data=downloads['md']['content'],
+                                                file_name=downloads['md']['filename'],
+                                                mime=downloads['md']['mime'],
+                                                key=f"md_{i}",
+                                                use_container_width=True
+                                            )
+                                        
+                                        with col_h4:
+                                            st.download_button(
+                                                "📋 CSV",
+                                                data=downloads['csv']['content'],
+                                                file_name=downloads['csv']['filename'],
+                                                mime=downloads['csv']['mime'],
+                                                key=f"csv_{i}",
+                                                use_container_width=True
+                                            )
                                 else:
                                     st.error(f"❌ {result_data['error']}")
             else:
