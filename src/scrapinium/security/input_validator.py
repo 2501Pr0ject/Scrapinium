@@ -123,8 +123,9 @@ class AdvancedInputValidator:
         # Décoder l'URL
         try:
             value = urllib.parse.unquote(value)
-        except:
-            pass
+        except (ValueError, UnicodeDecodeError) as e:
+            logger.warning(f"Failed to URL decode value: {e}")
+            # Garder la valeur originale si décodage échoue
         
         # Supprimer les caractères de contrôle
         value = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', value)
@@ -183,8 +184,8 @@ class AdvancedInputValidator:
                             if ipaddress.ip_address(domain) in ipaddress.ip_network(blocked):
                                 errors.append(f"IP bloquée: {domain}")
                                 risk_score += 5.0
-                        except:
-                            pass
+                        except (ipaddress.AddressValueError, ipaddress.NetmaskValueError, ValueError) as e:
+                            logger.debug(f"Invalid IP/CIDR format for domain {domain} and blocked {blocked}: {e}")
                     elif domain == blocked or domain.endswith(f".{blocked}"):
                         errors.append(f"Domaine bloqué: {domain}")
                         risk_score += 5.0
@@ -195,7 +196,8 @@ class AdvancedInputValidator:
                     if ip.is_private or ip.is_loopback or ip.is_link_local:
                         errors.append(f"IP privée/locale non autorisée: {ip}")
                         risk_score += 6.0
-                except:
+                except (ipaddress.AddressValueError, ValueError):
+                    # Ce n'est pas une IP, c'est un nom de domaine normal
                     pass
             
             # Vérifier le chemin pour path traversal

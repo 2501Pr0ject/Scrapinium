@@ -329,8 +329,8 @@ class BrowserManager:
                     logger.warning(f"Erreur lors de la gestion du contexte: {e}")
                     try:
                         await context.close()
-                    except:
-                        pass
+                    except Exception as close_error:
+                        logger.error(f"Failed to close browser context: {close_error}")
 
     @asynccontextmanager
     async def create_page(
