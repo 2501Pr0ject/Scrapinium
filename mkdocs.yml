@@ -1,0 +1,211 @@
+site_name: Scrapinium Documentation
+site_description: Enterprise-grade web scraping solution with LLM integration
+site_author: Scrapinium Team
+site_url: https://your-username.github.io/scrapinium/
+
+# Repository
+repo_name: your-username/scrapinium
+repo_url: https://github.com/your-username/scrapinium
+edit_uri: edit/main/docs/
+
+# Copyright
+copyright: Copyright &copy; 2024 Scrapinium Team
+
+# Configuration
+theme:
+  name: material
+  language: en
+  
+  # Colors
+  palette:
+    - scheme: default
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  
+  # Font
+  font:
+    text: Roboto
+    code: Roboto Mono
+  
+  # Logo
+  logo: assets/logo.png
+  favicon: assets/favicon.ico
+  
+  # Features
+  features:
+    - announce.dismiss
+    - content.action.edit
+    - content.action.view
+    - content.code.annotate
+    - content.code.copy
+    - content.tabs.link
+    - content.tooltips
+    - header.autohide
+    - navigation.expand
+    - navigation.footer
+    - navigation.indexes
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.path
+    - navigation.prune
+    - navigation.sections
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+    - toc.integrate
+
+# Plugins
+plugins:
+  - search:
+      separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  - minify:
+      minify_html: true
+  - mermaid2:
+      arguments:
+        theme: |
+          ^(localStorage.getItem("__palette") || "(prefers-color-scheme: dark)").includes("dark") ? "dark" : "light"
+  - git-revision-date-localized:
+      enable_creation_date: true
+  - git-committers:
+      repository: your-username/scrapinium
+      branch: main
+
+# Extensions
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+      emoji_index: !!python/name:materialx.emoji.twemoji
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+      user: your-username
+      repo: scrapinium
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+# Navigation
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quickstart.md
+    - Configuration: getting-started/configuration.md
+  - User Guide:
+    - Basic Usage: user-guide/basic-usage.md
+    - Web Interface: user-guide/web-interface.md
+    - API Usage: user-guide/api-usage.md
+    - LLM Integration: user-guide/llm-integration.md
+    - Caching: user-guide/caching.md
+    - Security: user-guide/security.md
+    - Performance: user-guide/performance.md
+  - API Reference:
+    - Overview: api/overview.md
+    - Endpoints: api/endpoints.md
+    - Models: api/models.md
+    - Examples: api/examples.md
+  - Architecture:
+    - Overview: architecture/overview.md
+    - Components: architecture/components.md
+    - Data Flow: architecture/data-flow.md
+    - Performance: architecture/performance.md
+    - Security: architecture/security.md
+  - Development:
+    - Contributing: development/contributing.md
+    - Development Setup: development/setup.md
+    - Testing: development/testing.md
+    - Code Quality: development/code-quality.md
+    - Release Process: development/release-process.md
+  - Deployment:
+    - Docker: deployment/docker.md
+    - Kubernetes: deployment/kubernetes.md
+    - Production: deployment/production.md
+    - Monitoring: deployment/monitoring.md
+    - Scaling: deployment/scaling.md
+  - Examples:
+    - Basic Scraping: examples/basic-scraping.md
+    - LLM Processing: examples/llm-processing.md
+    - Batch Processing: examples/batch-processing.md
+    - Custom Integrations: examples/custom-integrations.md
+  - Troubleshooting:
+    - Common Issues: troubleshooting/common-issues.md
+    - Performance Issues: troubleshooting/performance.md
+    - Security Issues: troubleshooting/security.md
+    - Debug Guide: troubleshooting/debug-guide.md
+  - About:
+    - Changelog: about/changelog.md
+    - License: about/license.md
+    - Support: about/support.md
+
+# Extra
+extra:
+  version:
+    provider: mike
+  analytics:
+    provider: google
+    property: !ENV GOOGLE_ANALYTICS_KEY
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/your-username/scrapinium
+    - icon: fontawesome/brands/docker
+      link: https://hub.docker.com/r/your-username/scrapinium
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/scrapinium/
+  status:
+    new: Recently added
+    deprecated: Deprecated
+
+# Extra CSS/JS
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+# Watch
+watch:
+  - src/scrapinium

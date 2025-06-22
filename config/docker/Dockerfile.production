@@ -1,0 +1,80 @@
+# Dockerfile optimisé pour la production
+FROM python:3.11-slim as builder
+
+# Variables d'environnement pour optimiser Python
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Installer les dépendances système nécessaires pour la compilation
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Créer et activer un environnement virtuel
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copier et installer les dépendances Python
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# =======================================
+# Stage de production
+# =======================================
+FROM python:3.11-slim as production
+
+# Variables d'environnement
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    SCRAPINIUM_ENV=production
+
+# Installer les dépendances runtime
+RUN apt-get update && apt-get install -y \
+    # Dépendances Playwright
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libgtk-3-0 \
+    libgbm1 \
+    libasound2 \
+    # Utilitaires système
+    curl \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copier l'environnement virtuel depuis le stage builder
+COPY --from=builder /opt/venv /opt/venv
+
+# Créer un utilisateur non-root pour la sécurité
+RUN groupadd -r scrapinium && useradd -r -g scrapinium scrapinium
+
+# Créer les répertoires nécessaires
+RUN mkdir -p /app /app/logs /app/data && \
+    chown -R scrapinium:scrapinium /app
+
+# Copier le code de l'application
+COPY --chown=scrapinium:scrapinium . /app
+
+# Changer vers l'utilisateur non-root
+USER scrapinium
+WORKDIR /app
+
+# Installer Playwright browsers
+RUN playwright install chromium
+
+# Exposer le port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Commande par défaut
+CMD ["uvicorn", "src.scrapinium.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]

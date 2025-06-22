@@ -106,6 +106,10 @@ def create_app() -> FastAPI:
 def setup_routes(app: FastAPI):
     """Configure les routes de l'API."""
     
+    # Import des endpoints de performance
+    from .endpoints.performance import router as performance_router
+    app.include_router(performance_router)
+    
     # Configuration des templates
     templates = Jinja2Templates(directory="templates")
     

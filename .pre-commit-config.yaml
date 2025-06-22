@@ -1,0 +1,283 @@
+# Pre-commit hooks configuration for Scrapinium
+# Installation: pip install pre-commit && pre-commit install
+
+repos:
+  # ===========================
+  # GENERAL HOOKS
+  # ===========================
+  
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        name: "🧹 Remove trailing whitespace"
+      - id: end-of-file-fixer
+        name: "📝 Fix end of files"
+      - id: check-yaml
+        name: "✅ Check YAML syntax"
+      - id: check-toml
+        name: "✅ Check TOML syntax"
+      - id: check-json
+        name: "✅ Check JSON syntax"
+      - id: check-added-large-files
+        name: "📏 Check for large files"
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+        name: "🔀 Check for merge conflicts"
+      - id: debug-statements
+        name: "🐛 Check for debug statements"
+      - id: check-docstring-first
+        name: "📚 Check docstring first"
+
+  # ===========================
+  # PYTHON CODE FORMATTING
+  # ===========================
+  
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        name: "🖤 Format with Black"
+        language_version: python3
+        args: ['--line-length=88']
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: "📦 Sort imports with isort"
+        args: ["--profile", "black", "--line-length", "88"]
+
+  # ===========================
+  # PYTHON CODE QUALITY
+  # ===========================
+  
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        name: "🔍 Lint with flake8"
+        args: ['--max-line-length=88', '--extend-ignore=E203,W503']
+        additional_dependencies:
+          - flake8-docstrings
+          - flake8-bugbear
+          - flake8-comprehensions
+          - flake8-simplify
+
+  - repo: https://github.com/pycqa/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        name: "🛡️ Security scan with Bandit"
+        args: ['-r', 'src/', '-f', 'json', '-o', 'bandit-report.json']
+        pass_filenames: false
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        name: "🔬 Type check with MyPy"
+        args: [--ignore-missing-imports]
+        additional_dependencies:
+          - types-requests
+          - types-redis
+          - types-PyYAML
+
+  # ===========================
+  # DOCUMENTATION
+  # ===========================
+  
+  - repo: https://github.com/pycqa/pydocstyle
+    rev: 6.3.0
+    hooks:
+      - id: pydocstyle
+        name: "📖 Check docstrings with pydocstyle"
+        args: ['--convention=google']
+
+  - repo: https://github.com/myint/docformatter
+    rev: v1.7.5
+    hooks:
+      - id: docformatter
+        name: "📝 Format docstrings"
+        args: ['--in-place', '--wrap-summaries', '88', '--wrap-descriptions', '88']
+
+  # ===========================
+  # SECURITY & SECRETS
+  # ===========================
+  
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        name: "🔐 Detect secrets"
+        args: ['--baseline', '.secrets.baseline']
+        exclude: ^(\.secrets\.baseline|tests/.*\.py)$
+
+  - repo: https://github.com/gitguardian/ggshield
+    rev: v1.25.0
+    hooks:
+      - id: ggshield
+        name: "🛡️ GitGuardian secret scan"
+        language: python
+        stages: [commit]
+
+  # ===========================
+  # DEPENDENCY MANAGEMENT
+  # ===========================
+  
+  - repo: https://github.com/pycqa/pip-audit
+    rev: v2.6.2
+    hooks:
+      - id: pip-audit
+        name: "🔍 Audit dependencies"
+        args: ['--require-hashes', '--disable-pip']
+
+  - repo: https://github.com/Lucas-C/pre-commit-hooks-safety
+    rev: v1.3.2
+    hooks:
+      - id: python-safety-dependencies-check
+        name: "🛡️ Safety dependency scan"
+
+  # ===========================
+  # CONFIGURATION FILES
+  # ===========================
+  
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        name: "✅ Lint YAML files"
+        args: [-c=.yamllint.yml]
+
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        name: "✨ Format with Prettier"
+        types_or: [yaml, markdown, json]
+        exclude: ^(CHANGELOG\.md|.*\.min\.js)$
+
+  # ===========================
+  # TESTING
+  # ===========================
+  
+  - repo: local
+    hooks:
+      - id: pytest-fast
+        name: "🧪 Run fast tests"
+        entry: python -m pytest tests/ -m "not slow" --tb=short
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: coverage-check
+        name: "📊 Check test coverage"
+        entry: python -m pytest tests/ --cov=src/scrapinium --cov-fail-under=80 --cov-report=term-missing:skip-covered
+        language: system
+        pass_filenames: false
+        always_run: true
+
+  # ===========================
+  # DOCKERFILE & CONTAINERS
+  # ===========================
+  
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        name: "🐳 Lint Dockerfile"
+        args: ['--ignore', 'DL3008', '--ignore', 'DL3009']
+
+  # ===========================
+  # PERFORMANCE & BENCHMARKS
+  # ===========================
+  
+  - repo: local
+    hooks:
+      - id: performance-check
+        name: "⚡ Performance regression check"
+        entry: python scripts/performance_check.py
+        language: system
+        pass_filenames: false
+        stages: [push]
+
+  # ===========================
+  # CUSTOM VALIDATION
+  # ===========================
+  
+  - repo: local
+    hooks:
+      - id: validate-api-schemas
+        name: "🔍 Validate API schemas"
+        entry: python scripts/validate_api_schemas.py
+        language: system
+        files: ^src/scrapinium/api/
+        pass_filenames: false
+
+      - id: check-environment-vars
+        name: "🔧 Check environment variables"
+        entry: python scripts/check_env_vars.py
+        language: system
+        files: ^(src/.*\.py|\.env\.example)$
+        pass_filenames: false
+
+      - id: validate-security-config
+        name: "🛡️ Validate security configuration"
+        entry: python scripts/validate_security.py
+        language: system
+        files: ^src/scrapinium/security/
+        pass_filenames: false
+
+      - id: check-migrations
+        name: "🗄️ Check database migrations"
+        entry: python scripts/check_migrations.py
+        language: system
+        files: ^(alembic/|src/scrapinium/models/)
+        pass_filenames: false
+
+# ===========================
+# GLOBAL CONFIGURATION
+# ===========================
+
+ci:
+  autofix_commit_msg: |
+    🤖 [pre-commit.ci] auto fixes from pre-commit hooks
+
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: 'main'
+  autoupdate_commit_msg: '🔄 [pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: [pip-audit, python-safety-dependencies-check, hadolint-docker]
+  submodules: false
+
+default_language_version:
+  python: python3.9
+  node: "18.0.0"
+
+default_stages: [commit]
+
+exclude: |
+  (?x)^(
+    .*\.min\.(js|css)|
+    .*\.bundle\.(js|css)|
+    node_modules/|
+    venv/|
+    \.venv/|
+    migrations/|
+    static/vendor/|
+    docs/_build/|
+    \.git/|
+    \.pytest_cache/|
+    __pycache__/|
+    \.mypy_cache/|
+    \.coverage|
+    htmlcov/|
+    dist/|
+    build/|
+    \.eggs/|
+    .*\.egg-info/
+  )$
+
+fail_fast: false
+minimum_pre_commit_version: "3.0.0"
