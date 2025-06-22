@@ -1,4 +1,4 @@
-"""Application FastAPI pour Scrapinium."""
+"""Application FastAPI pour Scrapinium avec sécurité enterprise-grade."""
 
 import uuid
 from contextlib import asynccontextmanager
@@ -18,6 +18,12 @@ from ..scraping.browser import get_browser_stats
 from ..cache import get_cache_manager
 from ..utils.memory import get_memory_monitor
 from ..utils.cleanup import get_resource_cleaner, get_auto_cleaner
+
+# Import des composants de sécurité
+from ..security.rate_limiter import rate_limit_middleware, rate_limiter
+from ..security.headers import security_headers_middleware, security_headers
+from ..security.input_validator import input_validator, ValidationLevel
+from ..security.config_security import security_manager
 
 logger = get_logger("api")
 
@@ -77,13 +83,18 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Configuration CORS
+    # Configuration des middlewares de sécurité (ordre important)
+    # 1. Headers de sécurité (en premier)
+    app.middleware("http")(security_headers_middleware)
+    
+    # 2. Rate limiting (après headers)
+    app.middleware("http")(rate_limit_middleware)
+    
+    # 3. CORS sécurisé (utilise la config de security_headers)
+    cors_middleware = security_headers.create_cors_middleware()
     app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins,
-        allow_credentials=True,
-        allow_methods=settings.cors_methods,
-        allow_headers=settings.cors_headers,
+        type(cors_middleware),
+        **cors_middleware.__dict__
     )
 
     # Routes principales
@@ -504,6 +515,154 @@ def setup_routes(app: FastAPI):
             logger.error(f"Erreur récupération stats nettoyage: {e}")
             return APIResponse.error_response(
                 message="Erreur lors de la récupération des statistiques de nettoyage",
+                details=str(e)
+            )
+    
+    # === ENDPOINTS DE SÉCURITÉ ===
+    
+    @app.get("/security/rate-limit/stats")
+    async def get_rate_limit_stats():
+        """Statistiques du rate limiting."""
+        try:
+            stats = rate_limiter.get_stats()
+            return APIResponse.success_response(
+                data=stats,
+                message="Statistiques de rate limiting récupérées"
+            )
+        except Exception as e:
+            logger.error(f"Erreur récupération stats rate limiting: {e}")
+            return APIResponse.error_response(
+                message="Erreur lors de la récupération des statistiques de rate limiting",
+                details=str(e)
+            )
+    
+    @app.get("/security/headers/config")
+    async def get_security_headers_config():
+        """Configuration des headers de sécurité."""
+        try:
+            report = security_headers.get_security_report()
+            return APIResponse.success_response(
+                data=report,
+                message="Configuration de sécurité récupérée"
+            )
+        except Exception as e:
+            logger.error(f"Erreur récupération config sécurité: {e}")
+            return APIResponse.error_response(
+                message="Erreur lors de la récupération de la configuration de sécurité",
+                details=str(e)
+            )
+    
+    @app.get("/security/compliance/check")
+    async def get_compliance_status():
+        """Vérification de conformité sécurité."""
+        try:
+            # Vérifier l'environnement
+            env_validation = security_manager.validate_environment_security()
+            
+            # Vérifier la conformité
+            compliance_check = security_manager.get_compliance_checklist()
+            
+            combined_report = {
+                "environment_security": env_validation,
+                "compliance": compliance_check,
+                "overall_score": (env_validation["score"] + compliance_check["compliance_score"]) / 2,
+                "critical_issues": env_validation["issues"],
+                "recommendations": env_validation["recommendations"] + compliance_check["recommendations"]
+            }
+            
+            return APIResponse.success_response(
+                data=combined_report,
+                message="Audit de sécurité effectué"
+            )
+        except Exception as e:
+            logger.error(f"Erreur audit sécurité: {e}")
+            return APIResponse.error_response(
+                message="Erreur lors de l'audit de sécurité",
+                details=str(e)
+            )
+    
+    @app.post("/security/validation/test")
+    async def test_input_validation(request: Request):
+        """Tester la validation des inputs (endpoint de debug)."""
+        try:
+            # Obtenir le body de la requête
+            body = await request.body()
+            if body:
+                import json
+                try:
+                    payload = json.loads(body)
+                except:
+                    payload = {"raw_data": body.decode()}
+            else:
+                payload = {}
+            
+            # Valider les différents types d'inputs
+            validation_results = []
+            
+            # Valider URL si présente
+            if "url" in payload:
+                url_result = input_validator.validate_url(payload["url"])
+                validation_results.append({
+                    "input_type": "url",
+                    "result": {
+                        "is_valid": url_result.is_valid,
+                        "sanitized_value": url_result.sanitized_value,
+                        "errors": url_result.errors,
+                        "warnings": url_result.warnings,
+                        "risk_score": url_result.risk_score
+                    }
+                })
+            
+            # Valider JSON payload
+            if payload:
+                json_result = input_validator.validate_json_payload(payload)
+                validation_results.append({
+                    "input_type": "json_payload",
+                    "result": {
+                        "is_valid": json_result.is_valid,
+                        "sanitized_value": json_result.sanitized_value,
+                        "errors": json_result.errors,
+                        "warnings": json_result.warnings,
+                        "risk_score": json_result.risk_score
+                    }
+                })
+            
+            # Valider User-Agent
+            user_agent = request.headers.get("user-agent", "")
+            if user_agent:
+                ua_result = input_validator.validate_user_agent(user_agent)
+                validation_results.append({
+                    "input_type": "user_agent",
+                    "result": {
+                        "is_valid": ua_result.is_valid,
+                        "sanitized_value": ua_result.sanitized_value,
+                        "errors": ua_result.errors,
+                        "warnings": ua_result.warnings,
+                        "risk_score": ua_result.risk_score
+                    }
+                })
+            
+            # Résumé de validation
+            summary = input_validator.get_validation_summary(
+                [r["result"] for r in validation_results if "result" in r]
+            )
+            
+            response_data = {
+                "validation_results": validation_results,
+                "summary": summary,
+                "security_level": input_validator.level.value,
+                "timestamp": "2024-12-21T10:00:00Z"
+            }
+            
+            return APIResponse.success_response(
+                data=response_data,
+                message="Test de validation effectué"
+            )
+            
+        except Exception as e:
+            logger.error(f"Erreur test validation: {e}")
+            return APIResponse.error_response(
+                message="Erreur lors du test de validation",
                 details=str(e)
             )
 
