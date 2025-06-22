@@ -339,6 +339,251 @@ GET /stats/browser
 }
 ```
 
+## 🧠 Machine Learning API
+
+### POST /ml/analyze
+**Analyse ML complète d'une page web**
+
+```http
+POST /ml/analyze
+Content-Type: application/json
+
+{
+  "html": "<html>...</html>",
+  "url": "https://example.com",
+  "headers": {
+    "user-agent": "Mozilla/5.0..."
+  },
+  "response_time": 2.5,
+  "metadata": {}
+}
+```
+
+**Paramètres:**
+- `html` (string, required): Code HTML de la page
+- `url` (string, required): URL de la page
+- `headers` (object): Headers HTTP de la réponse
+- `response_time` (number): Temps de réponse en secondes
+- `metadata` (object): Métadonnées additionnelles
+
+**Réponse 200:**
+```json
+{
+  "success": true,
+  "data": {
+    "classification": {
+      "page_type": "article",
+      "confidence": 0.89,
+      "quality": "high",
+      "language": "fr"
+    },
+    "bot_detection": {
+      "challenges": ["cloudflare"],
+      "confidence": 0.3,
+      "strategies": ["stealth_mode", "delay_randomization"],
+      "warnings": ["Rate limiting detected"]
+    },
+    "content_analysis": {
+      "word_count": 1250,
+      "readability_score": 75.0,
+      "sentiment_score": 0.2,
+      "topics": ["technology", "web"],
+      "keywords": [["web", 15], ["scraping", 12]]
+    },
+    "metrics": {
+      "processing_time": 0.053,
+      "confidence_score": 0.823
+    },
+    "recommendations": [
+      "Content quality is high - standard extraction recommended",
+      "Cloudflare detected - use stealth mode"
+    ],
+    "scraping_config": {
+      "extraction_strategy": {...},
+      "anti_bot_config": {...},
+      "performance_settings": {...}
+    }
+  }
+}
+```
+
+### POST /ml/classify
+**Classification de contenu uniquement**
+
+```http
+POST /ml/classify
+Content-Type: application/json
+
+{
+  "html": "<html>...</html>",
+  "url": "https://example.com",
+  "metadata": {}
+}
+```
+
+**Réponse 200:**
+```json
+{
+  "success": true,
+  "data": {
+    "page_type": "article",
+    "confidence": 0.89,
+    "quality": "high",
+    "language": "fr",
+    "insights": {
+      "summary": "Page de type 'article' avec une qualité 'high'",
+      "recommendations": ["Extract title, author, date and main content"],
+      "extraction_strategy": {
+        "selectors": ["article", ".content"],
+        "priority_elements": ["h1", "h2", "p"]
+      }
+    }
+  }
+}
+```
+
+### POST /ml/detect-bot
+**Détection des défis anti-bot**
+
+```http
+POST /ml/detect-bot
+Content-Type: application/json
+
+{
+  "html": "<html>...</html>",
+  "url": "https://example.com",
+  "headers": {"cf-ray": "12345"},
+  "response_time": 5.2
+}
+```
+
+**Réponse 200:**
+```json
+{
+  "success": true,
+  "data": {
+    "challenges": ["cloudflare", "rate_limiting"],
+    "confidence": 0.85,
+    "strategies": ["stealth_mode", "rotation", "delay_randomization"],
+    "warnings": ["High response time detected", "Cloudflare protection active"],
+    "stealth_config": {
+      "user_agent": "Mozilla/5.0 (realistic agent)",
+      "headers": {...},
+      "behavior": {
+        "simulate_mouse": true,
+        "random_scrolling": true
+      },
+      "delays": {
+        "base_delay": 2.0,
+        "random_factor": 1.2
+      }
+    },
+    "recommended_delays": {
+      "reading": [4.0, 12.0],
+      "clicking": [1.0, 4.0],
+      "page_load": [2.0, 6.0]
+    }
+  }
+}
+```
+
+### GET /ml/stats
+**Statistiques du pipeline ML**
+
+```http
+GET /ml/stats
+```
+
+**Réponse 200:**
+```json
+{
+  "success": true,
+  "data": {
+    "total_analyses": 1247,
+    "avg_processing_time": 0.052,
+    "success_rate": 0.98,
+    "cache_hits": 450,
+    "cache_misses": 797,
+    "min_processing_time": 0.021,
+    "max_processing_time": 0.145,
+    "avg_confidence_score": 0.823,
+    "page_types_distribution": {
+      "article": 520,
+      "ecommerce": 312,
+      "blog": 415
+    },
+    "bot_detection_frequency": {
+      "pages_with_challenges": 89,
+      "avg_challenges_per_page": 1.2,
+      "max_challenges": 4
+    }
+  }
+}
+```
+
+### GET /ml/cache/stats
+**Statistiques du cache ML**
+
+```http
+GET /ml/cache/stats
+```
+
+**Réponse 200:**
+```json
+{
+  "success": true,
+  "data": {
+    "cache_enabled": true,
+    "total_entries": 350,
+    "expired_entries": 12,
+    "cache_hits": 450,
+    "cache_misses": 797,
+    "hit_rate_percent": 36.1,
+    "cache_ttl_seconds": 3600
+  }
+}
+```
+
+### DELETE /ml/cache
+**Vider le cache ML**
+
+```http
+DELETE /ml/cache
+```
+
+**Réponse 200:**
+```json
+{
+  "success": true,
+  "data": {
+    "cache_enabled": true,
+    "entries_cleared": 350,
+    "cache_hits": 450,
+    "cache_misses": 797
+  }
+}
+```
+
+### POST /ml/cache/optimize
+**Optimiser le cache ML**
+
+```http
+POST /ml/cache/optimize
+```
+
+**Réponse 200:**
+```json
+{
+  "success": true,
+  "data": {
+    "cache_enabled": true,
+    "initial_entries": 350,
+    "removed_entries": 23,
+    "remaining_entries": 327
+  }
+}
+```
+
 ## 🛡️ Security API
 
 ### GET /security/rate-limit/stats
@@ -672,6 +917,11 @@ X-RateLimit-Warning: Approaching rate limit
 | `/scrape` | 30 | 500 | 5,000 |
 | `/tasks` | 60 | 1,000 | 10,000 |
 | `/stats/*` | 60 | 1,000 | 10,000 |
+| `/ml/analyze` | 20 | 300 | 2,000 |
+| `/ml/classify` | 40 | 600 | 4,000 |
+| `/ml/detect-bot` | 40 | 600 | 4,000 |
+| `/ml/stats` | 60 | 1,000 | 10,000 |
+| `/ml/cache/*` | 30 | 500 | 3,000 |
 | `/maintenance/*` | 10 | 100 | 1,000 |
 
 ## 🔧 Configuration Headers

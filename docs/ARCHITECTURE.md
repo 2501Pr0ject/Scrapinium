@@ -22,6 +22,7 @@ Scrapinium suit une architecture modulaire enterprise-grade optimisée pour la p
 │  🧠 Business Logic                                        │
 │  ├── Scraping Service (Orchestration)                    │
 │  ├── LLM Integration (Ollama/OpenAI)                     │
+│  ├── ML Pipeline (Intelligence Layer)                    │
 │  ├── Content Processing Pipeline                         │
 │  └── Task Management                                     │
 ├─────────────────────────────────────────────────────────────┤
@@ -240,6 +241,92 @@ async def security_pipeline(request: Request, call_next):
     return response
 ```
 
+### 6. ML Pipeline (`src/scrapinium/ml/`)
+
+**Intelligence artificielle intégrée pour un scraping adaptatif**
+
+```python
+ml/
+├── ml_pipeline.py      # Pipeline ML principal
+├── content_classifier.py # Classification contenu 
+├── antibot_detector.py   # Détection anti-bot
+├── content_analyzer.py   # Analyse sémantique
+├── models/              # Modèles ML (future)
+└── training/           # Training pipeline (future)
+```
+
+**Pipeline ML Pattern:**
+
+```python
+class MLPipeline:
+    """Pipeline ML complet avec cache et parallélisation"""
+    
+    async def analyze_page(self, html: str, url: str) -> MLAnalysisResult:
+        """Analyse intelligente d'une page web"""
+        
+        # Cache check
+        cache_key = self._generate_cache_key(html, url)
+        cached = self._get_from_cache(cache_key)
+        if cached:
+            return cached
+        
+        # Analyses parallèles pour performance
+        classification_task = asyncio.create_task(
+            self.content_classifier.classify_page(html, url)
+        )
+        
+        bot_detection_task = asyncio.create_task(
+            self.antibot_detector.analyze_page(html, headers, url)
+        )
+        
+        classification, bot_detection = await asyncio.gather(
+            classification_task, bot_detection_task
+        )
+        
+        # Analyse sémantique
+        content_features = await self.content_analyzer.analyze_content(
+            html, classification.features['text_content'], url
+        )
+        
+        # Construction du résultat
+        result = MLAnalysisResult(
+            classification=classification,
+            bot_detection=bot_detection, 
+            content_features=content_features,
+            # ... autres champs
+        )
+        
+        # Cache storage
+        self._store_in_cache(cache_key, result)
+        return result
+```
+
+**Analyseurs Spécialisés:**
+
+```python
+# ContentClassifier - Classification de contenu
+class ContentClassifier:
+    def classify_page(self, html: str, url: str) -> ClassificationResult:
+        """Classifie le type et la qualité du contenu"""
+        # Types: article, ecommerce, blog, forum, news, documentation
+        # Qualité: high, medium, low, spam
+        # Langue: fr, en, es, unknown
+
+# AntibotDetector - Détection défis anti-bot  
+class AntibotDetector:
+    def analyze_page(self, html: str, headers: Dict) -> DetectionResult:
+        """Détecte les défis anti-bot et génère stratégies d'évasion"""
+        # Défis: cloudflare, recaptcha, rate_limiting, js_challenge
+        # Stratégies: stealth_mode, rotation, delay_randomization
+
+# ContentAnalyzer - Analyse sémantique
+class ContentAnalyzer:
+    def analyze_content(self, html: str, text: str) -> ContentFeatures:
+        """Analyse sémantique complète du contenu"""
+        # Métriques: mots, lisibilité, sentiment, topics, keywords
+        # Structure: titres, listes, tableaux, médias
+```
+
 ## 🔄 Flux de Données
 
 ### Workflow Scraping Complet
@@ -253,16 +340,28 @@ graph TB
     E -->|Oui| F[📤 Réponse Immédiate]
     E -->|Non| G[🎭 Browser Pool]
     G --> H[🔍 Content Extraction]
-    H --> I[🧠 LLM Processing]
-    I --> J[📊 Content Processing]
-    J --> K[💾 Cache Storage]
-    K --> L[📤 Réponse Finale]
+    H --> I[🧠 ML Analysis Pipeline]
+    I --> J[🧠 LLM Processing]
+    J --> K[📊 Content Processing]
+    K --> L[💾 Cache Storage]
+    L --> M[📤 Réponse Finale]
+    
+    I --> I1[🔍 Content Classification]
+    I --> I2[🛡️ Anti-bot Detection] 
+    I --> I3[📊 Content Analysis]
+    I1 --> J
+    I2 --> J
+    I3 --> J
     
     style A fill:#e1f5fe
     style B fill:#f3e5f5
     style G fill:#fff3e0
     style I fill:#e8f5e8
-    style L fill:#fce4ec
+    style I1 fill:#e3f2fd
+    style I2 fill:#f1f8e9
+    style I3 fill:#fff8e1
+    style J fill:#e8f5e8
+    style M fill:#fce4ec
 ```
 
 ### Cycle de Vie d'une Tâche

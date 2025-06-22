@@ -19,6 +19,9 @@ from ..cache import get_cache_manager
 from ..utils.memory import get_memory_monitor
 from ..utils.cleanup import get_resource_cleaner, get_auto_cleaner
 
+# Import du pipeline ML
+from ..ml import MLPipeline, ContentClassifier, AntibotDetector, ContentAnalyzer
+
 # Import des composants de sécurité
 from ..security.rate_limiter import rate_limit_middleware, rate_limiter
 from ..security.headers import security_headers_middleware, security_headers
@@ -30,6 +33,9 @@ logger = get_logger("api")
 # Stockage en mémoire des tâches (remplacé par BDD en production)
 active_tasks: dict[str, dict[str, Any]] = {}
 completed_tasks: list[dict[str, Any]] = []
+
+# Instance globale du pipeline ML
+ml_pipeline: MLPipeline | None = None
 
 
 @asynccontextmanager
@@ -54,6 +60,14 @@ async def lifespan(app: FastAPI):
             logger.warning("⚠️ Ollama non accessible - fonctionnalités LLM désactivées")
     except Exception as e:
         logger.warning(f"⚠️ Erreur de connexion Ollama: {e}")
+
+    # Initialiser le pipeline ML
+    try:
+        global ml_pipeline
+        ml_pipeline = MLPipeline()
+        logger.info("✅ Pipeline ML initialisé")
+    except Exception as e:
+        logger.error(f"❌ Erreur d'initialisation pipeline ML: {e}")
 
     logger.info("🎯 API Scrapinium prête!")
 
@@ -145,6 +159,7 @@ def setup_routes(app: FastAPI):
             "api": "healthy",
             "ollama": "unknown",
             "database": "unknown",
+            "ml_pipeline": "unknown",
         }
 
         # Vérifier Ollama
@@ -160,6 +175,15 @@ def setup_routes(app: FastAPI):
             health_status["database"] = "healthy"
         except Exception:
             health_status["database"] = "error"
+
+        # Vérifier le pipeline ML
+        try:
+            if ml_pipeline:
+                health_status["ml_pipeline"] = "healthy"
+            else:
+                health_status["ml_pipeline"] = "unavailable"
+        except Exception:
+            health_status["ml_pipeline"] = "error"
 
         return health_status
 
@@ -674,6 +698,242 @@ def setup_routes(app: FastAPI):
                 details=str(e)
             )
 
+    # Endpoints ML
+    @app.post("/ml/analyze")
+    async def ml_analyze_page(request: dict):
+        """Analyse ML complète d'une page web."""
+        try:
+            if not ml_pipeline:
+                raise HTTPException(status_code=503, detail="Pipeline ML non disponible")
+            
+            # Validation des inputs
+            if not request.get("html") or not request.get("url"):
+                raise HTTPException(status_code=400, detail="HTML et URL requis")
+            
+            # Analyser la page
+            result = await ml_pipeline.analyze_page(
+                html=request["html"],
+                url=request["url"],
+                headers=request.get("headers", {}),
+                response_time=request.get("response_time"),
+                metadata=request.get("metadata", {})
+            )
+            
+            # Convertir en dict pour la sérialisation
+            response_data = {
+                "classification": {
+                    "page_type": result.classification.page_type.value,
+                    "confidence": result.classification.confidence,
+                    "quality": result.classification.quality.value,
+                    "language": result.classification.language
+                },
+                "bot_detection": {
+                    "challenges": [c.value for c in result.bot_detection.challenges],
+                    "confidence": result.bot_detection.confidence,
+                    "strategies": [s.value for s in result.bot_detection.strategies],
+                    "warnings": result.bot_detection.warnings
+                },
+                "content_analysis": {
+                    "word_count": result.content_features.word_count,
+                    "readability_score": result.content_features.readability_score,
+                    "sentiment_score": result.content_features.sentiment_score,
+                    "topics": result.content_features.topics,
+                    "keywords": result.content_features.keywords[:10]
+                },
+                "metrics": {
+                    "processing_time": result.processing_time,
+                    "confidence_score": result.confidence_score
+                },
+                "recommendations": result.recommendations,
+                "scraping_config": result.scraping_config
+            }
+            
+            return APIResponse.success_response(
+                data=response_data,
+                message="Analyse ML complétée"
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Erreur analyse ML: {e}")
+            return APIResponse.error_response(
+                message="Erreur lors de l'analyse ML",
+                details=str(e)
+            )
+    
+    @app.post("/ml/classify")
+    async def ml_classify_content(request: dict):
+        """Classification de contenu uniquement."""
+        try:
+            if not ml_pipeline:
+                raise HTTPException(status_code=503, detail="Pipeline ML non disponible")
+            
+            if not request.get("html") or not request.get("url"):
+                raise HTTPException(status_code=400, detail="HTML et URL requis")
+            
+            # Classification seulement
+            result = ml_pipeline.content_classifier.classify_page(
+                html=request["html"],
+                url=request["url"],
+                metadata=request.get("metadata", {})
+            )
+            
+            response_data = {
+                "page_type": result.page_type.value,
+                "confidence": result.confidence,
+                "quality": result.quality.value,
+                "language": result.language,
+                "insights": ml_pipeline.content_classifier.get_content_insights(result)
+            }
+            
+            return APIResponse.success_response(
+                data=response_data,
+                message="Classification complétée"
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Erreur classification: {e}")
+            return APIResponse.error_response(
+                message="Erreur lors de la classification",
+                details=str(e)
+            )
+    
+    @app.post("/ml/detect-bot")
+    async def ml_detect_bot_challenges(request: dict):
+        """Détection des défis anti-bot."""
+        try:
+            if not ml_pipeline:
+                raise HTTPException(status_code=503, detail="Pipeline ML non disponible")
+            
+            if not request.get("html") or not request.get("url"):
+                raise HTTPException(status_code=400, detail="HTML et URL requis")
+            
+            # Détection anti-bot seulement
+            result = ml_pipeline.antibot_detector.analyze_page(
+                html=request["html"],
+                headers=request.get("headers", {}),
+                url=request["url"],
+                response_time=request.get("response_time")
+            )
+            
+            response_data = {
+                "challenges": [c.value for c in result.challenges],
+                "confidence": result.confidence,
+                "strategies": [s.value for s in result.strategies],
+                "warnings": result.warnings,
+                "stealth_config": ml_pipeline.antibot_detector.create_stealth_configuration(result),
+                "recommended_delays": ml_pipeline.antibot_detector.get_recommended_delays(result.challenges)
+            }
+            
+            return APIResponse.success_response(
+                data=response_data,
+                message="Détection anti-bot complétée"
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Erreur détection anti-bot: {e}")
+            return APIResponse.error_response(
+                message="Erreur lors de la détection anti-bot",
+                details=str(e)
+            )
+    
+    @app.get("/ml/stats")
+    async def ml_get_statistics():
+        """Statistiques du pipeline ML."""
+        try:
+            if not ml_pipeline:
+                raise HTTPException(status_code=503, detail="Pipeline ML non disponible")
+            
+            stats = ml_pipeline.get_performance_metrics()
+            
+            return APIResponse.success_response(
+                data=stats,
+                message="Statistiques ML récupérées"
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Erreur récupération stats ML: {e}")
+            return APIResponse.error_response(
+                message="Erreur lors de la récupération des statistiques",
+                details=str(e)
+            )
+    
+    @app.get("/ml/cache/stats")
+    async def ml_get_cache_statistics():
+        """Statistiques du cache ML."""
+        try:
+            if not ml_pipeline:
+                raise HTTPException(status_code=503, detail="Pipeline ML non disponible")
+            
+            cache_stats = ml_pipeline.get_cache_stats()
+            
+            return APIResponse.success_response(
+                data=cache_stats,
+                message="Statistiques cache ML récupérées"
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Erreur récupération stats cache ML: {e}")
+            return APIResponse.error_response(
+                message="Erreur lors de la récupération des statistiques cache",
+                details=str(e)
+            )
+    
+    @app.delete("/ml/cache")
+    async def ml_clear_cache():
+        """Vider le cache ML."""
+        try:
+            if not ml_pipeline:
+                raise HTTPException(status_code=503, detail="Pipeline ML non disponible")
+            
+            result = ml_pipeline.clear_cache()
+            
+            return APIResponse.success_response(
+                data=result,
+                message="Cache ML vidé"
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Erreur nettoyage cache ML: {e}")
+            return APIResponse.error_response(
+                message="Erreur lors du nettoyage du cache",
+                details=str(e)
+            )
+    
+    @app.post("/ml/cache/optimize")
+    async def ml_optimize_cache():
+        """Optimiser le cache ML (supprimer les entrées expirées)."""
+        try:
+            if not ml_pipeline:
+                raise HTTPException(status_code=503, detail="Pipeline ML non disponible")
+            
+            result = ml_pipeline.optimize_cache()
+            
+            return APIResponse.success_response(
+                data=result,
+                message="Cache ML optimisé"
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Erreur optimisation cache ML: {e}")
+            return APIResponse.error_response(
+                message="Erreur lors de l'optimisation du cache",
+                details=str(e)
+            )
+
 
 async def execute_scraping_task(task_id: str, task_data: ScrapingTaskCreate):
     """Exécute une tâche de scraping en arrière-plan."""
@@ -699,16 +959,65 @@ async def execute_scraping_task(task_id: str, task_data: ScrapingTaskCreate):
             progress_callback=progress_callback,
         )
 
+        # Analyse ML si le scraping a réussi et que ML est disponible
+        ml_analysis = None
+        if result["status"] == "completed" and ml_pipeline and result.get("html_content"):
+            try:
+                await progress_callback(task_id, 90, "Analyse ML en cours...")
+                
+                ml_analysis = await ml_pipeline.analyze_page(
+                    html=result["html_content"],
+                    url=str(task_data.url),
+                    headers=result.get("response_headers", {}),
+                    response_time=result.get("response_time"),
+                    metadata={"task_id": task_id}
+                )
+                
+                await progress_callback(task_id, 95, "Analyse ML terminée")
+                logger.info(f"✨ Analyse ML complétée pour la tâche {task_id}")
+                
+            except Exception as e:
+                logger.warning(f"⚠️ Erreur analyse ML pour tâche {task_id}: {e}")
+
         # Traiter le résultat
         if result["status"] == "completed":
             # Succès
+            task_metadata = result.get("task_metadata", {})
+            
+            # Ajouter les données ML si disponibles
+            if ml_analysis:
+                task_metadata["ml_analysis"] = {
+                    "classification": {
+                        "page_type": ml_analysis.classification.page_type.value,
+                        "confidence": ml_analysis.classification.confidence,
+                        "quality": ml_analysis.classification.quality.value,
+                        "language": ml_analysis.classification.language
+                    },
+                    "bot_detection": {
+                        "challenges": [c.value for c in ml_analysis.bot_detection.challenges],
+                        "confidence": ml_analysis.bot_detection.confidence,
+                        "warnings": ml_analysis.bot_detection.warnings
+                    },
+                    "content_metrics": {
+                        "word_count": ml_analysis.content_features.word_count,
+                        "readability_score": ml_analysis.content_features.readability_score,
+                        "sentiment_score": ml_analysis.content_features.sentiment_score,
+                        "topics": ml_analysis.content_features.topics
+                    },
+                    "performance": {
+                        "processing_time": ml_analysis.processing_time,
+                        "confidence_score": ml_analysis.confidence_score
+                    },
+                    "recommendations": ml_analysis.recommendations
+                }
+            
             completed_task = {
                 **active_tasks[task_id],
                 "status": "completed",
                 "progress": 100,
-                "message": "Terminé avec succès",
+                "message": "Terminé avec succès" + (" + analyse ML" if ml_analysis else ""),
                 "result": result["structured_content"],
-                "metadata": result.get("task_metadata", {}),
+                "metadata": task_metadata,
                 "execution_time_ms": result.get("execution_time_ms", 0),
                 "tokens_used": result.get("tokens_used", 0),
             }
