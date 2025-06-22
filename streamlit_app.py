@@ -7,9 +7,17 @@ import time
 import io
 from datetime import datetime
 from typing import Dict, Any
+import asyncio
+from src.scrapinium.ml import MLPipeline
 
 # Configuration
 API_BASE_URL = "http://localhost:8000"
+
+# Initialiser le pipeline ML
+@st.cache_resource
+def get_ml_pipeline():
+    """Initialise et cache le pipeline ML."""
+    return MLPipeline()
 
 # Configuration de la page
 st.set_page_config(
@@ -70,6 +78,51 @@ def call_api(endpoint: str, method: str = "GET", data: Dict[str, Any] = None) ->
     except requests.exceptions.RequestException as e:
         return {"error": f"Erreur de connexion: {str(e)}"}
 
+
+def analyze_content_with_ml(html_content: str, url: str, headers: Dict[str, str] = None) -> Dict[str, Any]:
+    """Analyse le contenu avec le pipeline ML."""
+    try:
+        ml_pipeline = get_ml_pipeline()
+        
+        # Créer un event loop si nécessaire
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        # Analyser le contenu
+        result = loop.run_until_complete(
+            ml_pipeline.analyze_page(
+                html=html_content,
+                url=url,
+                headers=headers or {}
+            )
+        )
+        
+        return {
+            'success': True,
+            'analysis': {
+                'page_type': result.classification.page_type.value,
+                'confidence': result.classification.confidence,
+                'quality': result.classification.quality.value,
+                'language': result.classification.language,
+                'word_count': result.content_features.word_count,
+                'readability_score': result.content_features.readability_score,
+                'completeness_score': result.content_features.completeness_score,
+                'bot_challenges': [c.value for c in result.bot_detection.challenges],
+                'recommendations': result.recommendations,
+                'topics': result.content_features.topics,
+                'top_keywords': result.content_features.keywords[:10],
+                'processing_time': result.processing_time,
+                'global_confidence': result.confidence_score
+            }
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
 
 def create_download_files(data: Dict[str, Any]) -> Dict[str, Any]:
     """Crée les fichiers de téléchargement dans différents formats."""
@@ -352,7 +405,7 @@ def main():
         st.header("📋 Résultats & Historique")
         
         # Onglets pour les résultats
-        tab1, tab2 = st.tabs(["📊 Dashboard", "📜 Historique"])
+        tab1, tab2, tab3 = st.tabs(["📊 Dashboard", "📜 Historique", "🤖 Analyse ML"])
         
         with tab1:
             st.subheader("⚡ Métriques Live")
@@ -468,12 +521,185 @@ def main():
                                     st.error(f"❌ {result_data['error']}")
             else:
                 st.info("📝 Aucune tâche dans l'historique")
+        
+        with tab3:
+            st.subheader("🤖 Analyse ML de Contenu")
+            
+            # Section pour analyser une URL spécifique
+            with st.form("ml_analysis_form"):
+                analysis_url = st.text_input(
+                    "🌐 URL à analyser avec ML",
+                    placeholder="https://example.com/article",
+                    help="Entrez l'URL pour une analyse ML complète"
+                )
+                
+                advanced_options = st.expander("⚙️ Options avancées")
+                with advanced_options:
+                    enable_bot_detection = st.checkbox("🛡️ Détection anti-bot", value=True)
+                    enable_content_analysis = st.checkbox("📊 Analyse de contenu", value=True)
+                    enable_classification = st.checkbox("🏷️ Classification de page", value=True)
+                
+                analyze_button = st.form_submit_button("🔬 Analyser avec ML")
+                
+                if analyze_button and analysis_url:
+                    with st.spinner("🤖 Analyse ML en cours..."):
+                        # Récupérer le contenu de la page
+                        scrape_result = call_api("/scrape", "POST", {
+                            "url": analysis_url,
+                            "task_type": "full_page",
+                            "priority": "high"
+                        })
+                        
+                        if 'error' not in scrape_result:
+                            task_id = scrape_result.get('data', {}).get('task_id')
+                            
+                            if task_id:
+                                # Attendre le résultat
+                                time.sleep(3)
+                                result_data = call_api(f"/scrape/{task_id}/result")
+                                
+                                if 'error' not in result_data:
+                                    # Analyser avec ML
+                                    page_data = result_data.get('data', {})
+                                    html_content = page_data.get('html', '')
+                                    
+                                    if html_content:
+                                        ml_analysis = analyze_content_with_ml(
+                                            html_content=html_content,
+                                            url=analysis_url
+                                        )
+                                        
+                                        if ml_analysis['success']:
+                                            analysis = ml_analysis['analysis']
+                                            
+                                            st.success("✅ Analyse ML terminée !")
+                                            
+                                            # Affichage des résultats
+                                            col_ml1, col_ml2, col_ml3 = st.columns(3)
+                                            
+                                            with col_ml1:
+                                                st.metric(
+                                                    "🏷️ Type de page", 
+                                                    analysis['page_type'].title(),
+                                                    f"Confiance: {analysis['confidence']:.1%}"
+                                                )
+                                            
+                                            with col_ml2:
+                                                st.metric(
+                                                    "⭐ Qualité",
+                                                    analysis['quality'].title(),
+                                                    f"Score: {analysis['readability_score']:.0f}/100"
+                                                )
+                                            
+                                            with col_ml3:
+                                                st.metric(
+                                                    "🌍 Langue",
+                                                    analysis['language'].upper(),
+                                                    f"{analysis['word_count']} mots"
+                                                )
+                                            
+                                            # Détails de l'analyse
+                                            if enable_classification:
+                                                with st.expander("🏷️ Classification détaillée", expanded=True):
+                                                    col_c1, col_c2 = st.columns(2)
+                                                    
+                                                    with col_c1:
+                                                        st.write(f"**Type détecté:** {analysis['page_type']}")
+                                                        st.write(f"**Confiance:** {analysis['confidence']:.1%}")
+                                                        st.write(f"**Qualité:** {analysis['quality']}")
+                                                        st.write(f"**Langue:** {analysis['language']}")
+                                                    
+                                                    with col_c2:
+                                                        st.write(f"**Lisibilité:** {analysis['readability_score']:.0f}/100")
+                                                        st.write(f"**Complétude:** {analysis['completeness_score']:.0f}/100")
+                                                        st.write(f"**Confiance globale:** {analysis['global_confidence']:.1%}")
+                                                        st.write(f"**Temps d'analyse:** {analysis['processing_time']:.2f}s")
+                                            
+                                            if enable_bot_detection and analysis['bot_challenges']:
+                                                with st.expander("🛡️ Détection anti-bot", expanded=True):
+                                                    st.warning(f"⚠️ {len(analysis['bot_challenges'])} défi(s) anti-bot détecté(s)")
+                                                    
+                                                    for challenge in analysis['bot_challenges']:
+                                                        st.write(f"• {challenge.replace('_', ' ').title()}")
+                                            
+                                            if enable_content_analysis:
+                                                with st.expander("📊 Analyse de contenu", expanded=True):
+                                                    
+                                                    # Sujets détectés
+                                                    if analysis['topics']:
+                                                        st.write("**🎯 Sujets identifiés:**")
+                                                        for topic in analysis['topics']:
+                                                            st.write(f"• {topic.title()}")
+                                                    
+                                                    # Mots-clés principaux
+                                                    if analysis['top_keywords']:
+                                                        st.write("**🔑 Mots-clés principaux:**")
+                                                        keywords_text = ", ".join([f"{kw[0]} ({kw[1]})" for kw in analysis['top_keywords']])
+                                                        st.write(keywords_text)
+                                            
+                                            # Recommandations
+                                            if analysis['recommendations']:
+                                                with st.expander("💡 Recommandations", expanded=True):
+                                                    for rec in analysis['recommendations']:
+                                                        st.write(f"• {rec}")
+                                        
+                                        else:
+                                            st.error(f"❌ Erreur ML: {ml_analysis['error']}")
+                                    else:
+                                        st.error("❌ Contenu HTML non disponible")
+                                else:
+                                    st.error(f"❌ {result_data['error']}")
+                            else:
+                                st.error("❌ Task ID non trouvé")
+                        else:
+                            st.error(f"❌ {scrape_result['error']}")
+            
+            st.divider()
+            
+            # Section des métriques ML
+            st.subheader("📈 Métriques ML du Pipeline")
+            
+            if st.button("🔄 Actualiser Métriques ML"):
+                with st.spinner("Chargement des métriques ML..."):
+                    try:
+                        ml_pipeline = get_ml_pipeline()
+                        metrics = ml_pipeline.get_performance_metrics()
+                        st.session_state['ml_metrics'] = metrics
+                    except Exception as e:
+                        st.error(f"Erreur lors du chargement des métriques: {str(e)}")
+            
+            if 'ml_metrics' in st.session_state:
+                metrics = st.session_state['ml_metrics']
+                
+                col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+                
+                with col_m1:
+                    st.metric("🔬 Analyses totales", metrics.get('total_analyses', 0))
+                
+                with col_m2:
+                    st.metric("⏱️ Temps moyen", f"{metrics.get('avg_processing_time', 0):.2f}s")
+                
+                with col_m3:
+                    st.metric("✅ Taux de succès", f"{metrics.get('success_rate', 0):.1%}")
+                
+                with col_m4:
+                    st.metric("🎯 Confiance moyenne", f"{metrics.get('avg_confidence_score', 0):.1%}")
+                
+                # Distribution des types de pages
+                if 'page_types_distribution' in metrics:
+                    st.write("**📊 Distribution des types de pages:**")
+                    page_dist = metrics['page_types_distribution']
+                    if page_dist:
+                        for page_type, count in page_dist.items():
+                            st.write(f"• {page_type.title()}: {count}")
+                    else:
+                        st.info("Aucune donnée disponible")
     
     # Section de test rapide
     st.divider()
     st.header("🧪 Tests Rapides")
     
-    col3, col4, col5 = st.columns(3)
+    col3, col4, col5, col6 = st.columns(4)
     
     with col3:
         if st.button("🏥 Test Health", use_container_width=True):
@@ -506,6 +732,46 @@ def main():
                     st.json(result)
                 else:
                     st.error(f"❌ {result['error']}")
+    
+    with col6:
+        if st.button("🤖 Test ML", use_container_width=True):
+            with st.spinner("Test ML en cours..."):
+                try:
+                    ml_pipeline = get_ml_pipeline()
+                    
+                    # Test avec du contenu HTML simple
+                    test_html = """
+                    <html>
+                    <head><title>Test Article</title></head>
+                    <body>
+                    <h1>Article de Test</h1>
+                    <p>Ceci est un article de test pour vérifier le fonctionnement du pipeline ML.</p>
+                    <p>Il contient plusieurs paragraphes avec du contenu de qualité.</p>
+                    </body>
+                    </html>
+                    """
+                    
+                    # Créer un event loop si nécessaire
+                    try:
+                        loop = asyncio.get_event_loop()
+                    except RuntimeError:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                    
+                    result = loop.run_until_complete(
+                        ml_pipeline.analyze_page(
+                            html=test_html,
+                            url="https://test.example.com",
+                            headers={}
+                        )
+                    )
+                    
+                    st.success("✅ Pipeline ML fonctionnel")
+                    st.write(f"Type détecté: {result.classification.page_type.value}")
+                    st.write(f"Confiance: {result.confidence_score:.1%}")
+                    
+                except Exception as e:
+                    st.error(f"❌ Erreur ML: {str(e)}")
 
 if __name__ == "__main__":
     main()
