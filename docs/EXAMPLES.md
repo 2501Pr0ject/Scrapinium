@@ -997,6 +997,393 @@ export const ScrapingForm = () => {
           customInstructions: useLlm ? 'Extract and summarize main content' : ''
         },
         (progressData) => {
+          setProgress(progressData.progress);
+        }
+      );
+      
+      setResult(result);
+    } catch (err) {
+      console.error('Scraping failed:', err);
+    }
+  };
+  
+  return (
+    <div className="scraping-form">
+      <form onSubmit={handleSubmit}>
+        <input
+          type="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="Enter URL to scrape..."
+          required
+        />
+        
+        <label>
+          <input
+            type="checkbox"
+            checked={useLlm}
+            onChange={(e) => setUseLlm(e.target.checked)}
+          />
+          Use LLM Processing
+        </label>
+        
+        <button type="submit" disabled={loading}>
+          {loading ? `Scraping... ${progress}%` : 'Scrape URL'}
+        </button>
+      </form>
+      
+      {error && <div className="error">Error: {error}</div>}
+      {result && <div className="result">{result.structured_content}</div>}
+    </div>
+  );
+};
+```
+
+## 🧠 Exemples Machine Learning API
+
+### Analyse ML Complète
+
+```python
+import asyncio
+import httpx
+from scrapinium import ScrapiniumClient
+
+async def example_ml_analysis():
+    """Exemple d'utilisation complète du pipeline ML."""
+    
+    client = ScrapiniumClient("http://localhost:8000")
+    
+    # Scraper une page et obtenir l'analyse ML automatique
+    result = await client.scrape(
+        url="https://techblog.example.com/ai-article",
+        output_format="markdown",
+        use_llm=True
+    )
+    
+    # Les métadonnées contiennent l'analyse ML automatique
+    ml_data = result.metadata.get('ml_analysis')
+    if ml_data:
+        print("🧠 Analyse ML automatique:")
+        print(f"   Type: {ml_data['classification']['page_type']}")
+        print(f"   Qualité: {ml_data['classification']['quality']}")
+        print(f"   Langue: {ml_data['classification']['language']}")
+        print(f"   Défis anti-bot: {len(ml_data['bot_detection']['challenges'])}")
+        print(f"   Mots: {ml_data['content_metrics']['word_count']}")
+        print(f"   Lisibilité: {ml_data['content_metrics']['readability_score']}")
+    
+    # Analyse ML séparée pour plus de détails
+    async with httpx.AsyncClient() as http_client:
+        response = await http_client.post(
+            "http://localhost:8000/ml/analyze",
+            json={
+                "html": result.raw_html,  # HTML complet
+                "url": result.url,
+                "headers": result.response_headers,
+                "metadata": {"source": "manual_analysis"}
+            }
+        )
+        
+        detailed_ml = response.json()["data"]
+        
+        print("\n🔍 Analyse ML détaillée:")
+        print(f"   Confiance globale: {detailed_ml['metrics']['confidence_score']:.3f}")
+        print(f"   Temps traitement: {detailed_ml['metrics']['processing_time']:.3f}s")
+        print(f"   Topics: {detailed_ml['content_analysis']['topics']}")
+        print(f"   Keywords: {detailed_ml['content_analysis']['keywords'][:5]}")
+        
+        if detailed_ml['bot_detection']['challenges']:
+            print(f"   ⚠️ Défis détectés: {detailed_ml['bot_detection']['challenges']}")
+            print(f"   📋 Recommandations: {detailed_ml['recommendations']}")
+
+# Exécuter l'exemple
+asyncio.run(example_ml_analysis())
+```
+
+### Classification de Contenu
+
+```python
+async def classify_multiple_urls():
+    """Classifier plusieurs URLs pour analyser un site web."""
+    
+    urls = [
+        "https://shop.example.com/products/laptop",
+        "https://shop.example.com/blog/tech-review", 
+        "https://shop.example.com/support/documentation",
+        "https://shop.example.com/about-us"
+    ]
+    
+    classifications = []
+    
+    async with httpx.AsyncClient() as client:
+        for url in urls:
+            # Obtenir le HTML (simulation)
+            html_response = await client.get(url)
+            
+            # Classifier le contenu
+            ml_response = await client.post(
+                "http://localhost:8000/ml/classify",
+                json={
+                    "html": html_response.text,
+                    "url": url
+                }
+            )
+            
+            classification = ml_response.json()["data"]
+            classifications.append({
+                "url": url,
+                "type": classification["page_type"],
+                "quality": classification["quality"],
+                "confidence": classification["confidence"],
+                "language": classification["language"]
+            })
+    
+    # Analyser les résultats
+    print("📊 Classification du site web:")
+    for item in classifications:
+        print(f"   {item['type'].upper():12} | {item['quality']:6} | {item['confidence']:.2f} | {item['url']}")
+    
+    # Statistiques du site
+    page_types = [item['type'] for item in classifications]
+    print(f"\n📈 Distribution des types de pages:")
+    from collections import Counter
+    for page_type, count in Counter(page_types).items():
+        print(f"   {page_type}: {count}")
+
+asyncio.run(classify_multiple_urls())
+```
+
+### Détection Anti-Bot et Stratégies
+
+```python
+async def analyze_antibot_protection():
+    """Analyser les protections anti-bot d'un site."""
+    
+    target_urls = [
+        "https://protected-site.example.com",
+        "https://ecommerce-with-cloudflare.com", 
+        "https://news-site-with-captcha.com"
+    ]
+    
+    async with httpx.AsyncClient() as client:
+        for url in target_urls:
+            try:
+                # Requête initiale
+                response = await client.get(url)
+                
+                # Analyser les défis anti-bot
+                bot_analysis = await client.post(
+                    "http://localhost:8000/ml/detect-bot",
+                    json={
+                        "html": response.text,
+                        "url": url,
+                        "headers": dict(response.headers),
+                        "response_time": response.elapsed.total_seconds()
+                    }
+                )
+                
+                bot_data = bot_analysis.json()["data"]
+                
+                print(f"\n🛡️ Analyse de {url}:")
+                print(f"   Défis détectés: {bot_data['challenges']}")
+                print(f"   Confiance: {bot_data['confidence']:.2f}")
+                print(f"   Stratégies recommandées: {bot_data['strategies']}")
+                
+                if bot_data['warnings']:
+                    print(f"   ⚠️ Alertes: {bot_data['warnings']}")
+                
+                # Configuration furtive recommandée
+                stealth = bot_data['stealth_config']
+                print(f"   🥷 User-Agent recommandé: {stealth['user_agent'][:50]}...")
+                print(f"   ⏱️ Délai recommandé: {stealth['delays']['base_delay']}s")
+                
+                # Délais spécialisés
+                delays = bot_data['recommended_delays']
+                print(f"   📚 Délais lecture: {delays['reading'][0]:.1f}-{delays['reading'][1]:.1f}s")
+                print(f"   🖱️ Délais clic: {delays['clicking'][0]:.1f}-{delays['clicking'][1]:.1f}s")
+                
+            except Exception as e:
+                print(f"❌ Erreur pour {url}: {e}")
+
+asyncio.run(analyze_antibot_protection())
+```
+
+### Monitoring Pipeline ML
+
+```python
+async def monitor_ml_pipeline():
+    """Monitorer les performances du pipeline ML."""
+    
+    async with httpx.AsyncClient() as client:
+        # Statistiques générales
+        stats_response = await client.get("http://localhost:8000/ml/stats")
+        stats = stats_response.json()["data"]
+        
+        print("📊 Statistiques Pipeline ML:")
+        print(f"   Total analyses: {stats['total_analyses']}")
+        print(f"   Temps moyen: {stats['avg_processing_time']:.3f}s")
+        print(f"   Taux de succès: {stats['success_rate']:.1%}")
+        print(f"   Score confiance moyen: {stats['avg_confidence_score']:.3f}")
+        
+        # Distribution des types de pages
+        print(f"\n📈 Types de pages analysées:")
+        for page_type, count in stats['page_types_distribution'].items():
+            print(f"   {page_type}: {count}")
+        
+        # Fréquence détection anti-bot
+        bot_freq = stats['bot_detection_frequency']
+        print(f"\n🛡️ Détection anti-bot:")
+        print(f"   Pages avec défis: {bot_freq['pages_with_challenges']}")
+        print(f"   Défis moyens/page: {bot_freq['avg_challenges_per_page']:.1f}")
+        
+        # Statistiques du cache
+        cache_response = await client.get("http://localhost:8000/ml/cache/stats")
+        cache = cache_response.json()["data"]
+        
+        print(f"\n💾 Cache ML:")
+        print(f"   Entrées actives: {cache['total_entries']}")
+        print(f"   Hit rate: {cache['hit_rate_percent']:.1f}%")
+        print(f"   Entrées expirées: {cache['expired_entries']}")
+        
+        # Optimiser le cache si nécessaire
+        if cache['expired_entries'] > 50:
+            optimize_response = await client.post("http://localhost:8000/ml/cache/optimize")
+            optimize_data = optimize_response.json()["data"]
+            print(f"   🧹 Cache optimisé: {optimize_data['removed_entries']} entrées supprimées")
+
+asyncio.run(monitor_ml_pipeline())
+```
+
+### Intégration Workflow Personnalisé
+
+```python
+class IntelligentScraper:
+    """Scraper intelligent utilisant le pipeline ML pour s'adapter."""
+    
+    def __init__(self, api_url="http://localhost:8000"):
+        self.api_url = api_url
+        self.session = httpx.AsyncClient()
+    
+    async def smart_scrape(self, url: str, adaptive=True):
+        """Scraping intelligent avec adaptation basée sur l'analyse ML."""
+        
+        # 1. Analyse préliminaire ML
+        if adaptive:
+            preliminary_response = await self.session.get(url)
+            
+            ml_analysis = await self.session.post(
+                f"{self.api_url}/ml/analyze",
+                json={
+                    "html": preliminary_response.text[:5000],  # Preview
+                    "url": url,
+                    "headers": dict(preliminary_response.headers)
+                }
+            )
+            
+            ml_data = ml_analysis.json()["data"]
+            
+            print(f"🧠 Page détectée comme: {ml_data['classification']['page_type']}")
+            print(f"   Qualité: {ml_data['classification']['quality']}")
+            print(f"   Défis anti-bot: {len(ml_data['bot_detection']['challenges'])}")
+            
+            # Adapter la stratégie selon l'analyse ML
+            scraping_config = ml_data['scraping_config']
+            
+            # Configuration adaptative
+            use_stealth = len(ml_data['bot_detection']['challenges']) > 0
+            delay_factor = 1.0
+            
+            if use_stealth:
+                delay_factor = scraping_config['performance_settings']['request_delay']
+                print(f"   🥷 Mode furtif activé avec délai {delay_factor}s")
+            
+            # Stratégie d'extraction adaptée
+            extraction_strategy = scraping_config['extraction_strategy']
+            print(f"   🎯 Stratégie: {extraction_strategy}")
+        
+        # 2. Scraping principal adaptatif
+        scraping_request = {
+            "url": url,
+            "output_format": "markdown",
+            "use_llm": True,
+            "custom_instructions": self._get_adaptive_instructions(ml_data if adaptive else None)
+        }
+        
+        if adaptive and use_stealth:
+            await asyncio.sleep(delay_factor)  # Délai adaptatif
+        
+        scrape_response = await self.session.post(
+            f"{self.api_url}/scrape",
+            json=scraping_request
+        )
+        
+        task_data = scrape_response.json()["data"]
+        task_id = task_data["task_id"]
+        
+        # 3. Monitoring avec progression
+        result = await self._monitor_task(task_id)
+        
+        # 4. Post-traitement basé sur l'analyse ML
+        if adaptive and result and result.metadata.get('ml_analysis'):
+            ml_metadata = result.metadata['ml_analysis']
+            print(f"   ✅ Scraping terminé - Qualité finale: {ml_metadata['classification']['quality']}")
+            print(f"   📊 {ml_metadata['content_metrics']['word_count']} mots extraits")
+        
+        return result
+    
+    def _get_adaptive_instructions(self, ml_data):
+        """Instructions LLM adaptées selon le type de contenu détecté."""
+        if not ml_data:
+            return "Extract main content and structure it clearly"
+        
+        page_type = ml_data['classification']['page_type']
+        
+        instructions = {
+            'article': "Extract title, author, date, main content and key points. Summarize in structured format.",
+            'ecommerce': "Extract product name, price, description, specifications and reviews. Structure as product sheet.",
+            'blog': "Extract blog post title, author, date, content and tags. Include related posts if available.",
+            'news': "Extract headline, author, publication date, article content and category.",
+            'documentation': "Extract documentation structure, code examples, and technical details in organized format.",
+            'forum': "Extract discussion title, participants, main topics and key responses."
+        }
+        
+        return instructions.get(page_type, "Extract and structure the main content appropriately")
+    
+    async def _monitor_task(self, task_id):
+        """Monitoring de tâche avec progression."""
+        while True:
+            status_response = await self.session.get(f"{self.api_url}/scrape/{task_id}")
+            status_data = status_response.json()["data"]
+            
+            print(f"   📊 {status_data['status']}: {status_data['progress']}% - {status_data['message']}")
+            
+            if status_data['status'] in ['completed', 'failed']:
+                if status_data['status'] == 'completed':
+                    return status_data
+                else:
+                    raise Exception(f"Scraping failed: {status_data.get('error', 'Unknown error')}")
+            
+            await asyncio.sleep(2)
+
+# Exemple d'utilisation
+async def demo_intelligent_scraper():
+    scraper = IntelligentScraper()
+    
+    urls = [
+        "https://techcrunch.com/latest-ai-news",  # News
+        "https://amazon.com/product/laptop",       # E-commerce
+        "https://dev.to/python-tutorial",         # Article/Blog
+        "https://docs.python.org/asyncio"         # Documentation
+    ]
+    
+    for url in urls:
+        print(f"\n🔍 Scraping intelligent de: {url}")
+        try:
+            result = await scraper.smart_scrape(url, adaptive=True)
+            print(f"   ✅ Succès - {len(result.structured_content)} caractères extraits")
+        except Exception as e:
+            print(f"   ❌ Échec: {e}")
+
+asyncio.run(demo_intelligent_scraper())
           setProgress(progressData.percentage);
         }
       );

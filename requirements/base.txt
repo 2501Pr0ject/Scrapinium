@@ -1,0 +1,71 @@
+# Core Scrapinium Dependencies
+# Generated from pyproject.toml - DO NOT EDIT MANUALLY
+
+# Core framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Web scraping
+playwright>=1.40.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+html5lib>=1.1
+requests>=2.31.0
+aiohttp>=3.9.0
+
+# Database & Storage
+sqlalchemy>=2.0.0
+alembic>=1.13.0
+asyncpg>=0.29.0
+aiosqlite>=0.19.0
+
+# Caching & Performance  
+redis>=5.0.0
+hiredis>=2.2.0
+lz4>=4.3.0
+brotli>=1.1.0
+
+# LLM Integration
+openai>=1.6.0
+anthropic>=0.8.0
+ollama>=0.1.0
+tiktoken>=0.5.0
+
+# Security
+cryptography>=41.0.0
+bcrypt>=4.1.0
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.0
+
+# Monitoring & Observability
+psutil>=5.9.0
+prometheus-client>=0.19.0
+structlog>=23.2.0
+
+# Utilities
+python-multipart>=0.0.6
+python-dotenv>=1.0.0
+typer>=0.9.0
+rich>=13.7.0
+jinja2>=3.1.0
+markupsafe>=2.1.0
+pyyaml>=6.0.0
+toml>=0.10.0
+click>=8.1.0
+
+# Date & Time
+python-dateutil>=2.8.0
+pytz>=2023.3
+
+# Data Processing
+pandas>=2.1.0
+numpy>=1.24.0
+chardet>=5.2.0
+tldextract>=5.1.0
+
+# HTTP & Network
+httpx>=0.25.0
+urllib3>=2.1.0
+certifi>=2023.11.17

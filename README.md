@@ -22,11 +22,14 @@ Transformer le web scraping d'une tâche technique répétitive en un processus 
 - **Gestion robuste des erreurs** : Recovery automatique et retry intelligent
 
 ### 🧠 Intelligence artificielle
+- **Pipeline ML intégré** : Classification, détection anti-bot, analyse sémantique
 - **Structuration automatique** : Ollama local pour analyser et organiser le contenu
 - **Support LLM local** : Llama 3.1 8B par défaut, extensible à d'autres modèles
-- **Classification intelligente** : Identification automatique du type de contenu
+- **Classification intelligente** : 7 types de contenu avec évaluation qualité
+- **Détection anti-bot** : Cloudflare, reCAPTCHA, stratégies d'évasion automatiques
+- **Analyse sémantique** : Mots-clés, sentiment, topics, métriques de lisibilité
 - **Instructions personnalisées** : Prompts configurables pour chaque tâche
-- **Cache intelligent LLM** : Mise en cache des résultats pour éviter les répétitions
+- **Cache ML intelligent** : Analyse rapide avec TTL et auto-nettoyage
 
 ### 🏗️ Architecture moderne
 - **API REST complète** : Interface FastAPI avec endpoints documentés
@@ -72,10 +75,14 @@ poetry run playwright install chromium
 cp .env.example .env
 # Éditer .env avec vos paramètres
 
-# Lancer l'application
-poetry run python main.py
+# Lancer l'application FastAPI principale
+poetry run python src/scrapinium/api/app.py
 # ou
 make dev
+
+# Lancer un exemple spécifique
+poetry run python examples/fastapi/app.py
+poetry run streamlit run examples/streamlit/streamlit_app.py
 ```
 
 ### Installation avec Docker
@@ -175,8 +182,25 @@ Une interface web moderne est disponible sur `http://localhost:8000` avec :
 - **Gestion des tâches** : Liste et statut de toutes les tâches
 - **Thème sombre élégant** : Design moderne avec glassmorphism
 
-### Utilisation programmatique
+### Exemples d'utilisation
 
+Scrapinium propose plusieurs interfaces :
+
+#### API REST (Production)
+```bash
+# Utiliser l'API principale
+curl -X POST "http://localhost:8000/scrape" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com", "output_format": "markdown"}'
+```
+
+#### Interface Streamlit (Prototypage)
+```bash
+# Interface interactive pour tests et démos
+streamlit run examples/streamlit/streamlit_app.py
+```
+
+#### Utilisation programmatique
 ```python
 from scrapinium.scraping import scraping_service
 from scrapinium.models import ScrapingTaskCreate
@@ -189,15 +213,10 @@ task_data = ScrapingTaskCreate(
     custom_instructions="Extraire les informations principales"
 )
 
-# Callback pour suivre le progrès
-async def progress_callback(task_id, progress, message):
-    print(f"Tâche {task_id}: {progress}% - {message}")
-
 # Exécution du scraping
 result = await scraping_service.scrape_url(
     task_data=task_data,
-    task_id="test-task",
-    progress_callback=progress_callback
+    task_id="test-task"
 )
 
 print(f"Résultat: {result['structured_content']}")
@@ -210,43 +229,28 @@ Scrapinium suit une architecture hexagonale moderne avec séparation claire des 
 ```
 src/scrapinium/
 ├── api/              # Interface API (FastAPI)
-│   ├── __init__.py
-│   └── app.py        # Application principale et routes avancées
 ├── cache/            # Système de cache multi-niveau
-│   ├── __init__.py
-│   ├── manager.py    # Gestionnaire Redis + mémoire
-│   ├── models.py     # Modèles de cache
-│   └── strategies.py # Stratégies d'éviction (LRU, TTL)
 ├── scraping/         # Cœur du scraping optimisé
-│   ├── __init__.py
-│   ├── browser.py    # Pool de navigateurs Playwright
-│   ├── extractor.py  # Extraction de contenu
-│   └── service.py    # Service principal avec cache
+├── ml/               # Pipeline Machine Learning
 ├── llm/              # Intégration LLM
-│   ├── __init__.py
-│   └── ollama.py     # Client Ollama avec cache
 ├── utils/            # Utilitaires d'optimisation
-│   ├── __init__.py
-│   ├── memory.py     # Monitoring mémoire avancé
-│   ├── streaming.py  # Traitement streaming
-│   ├── compression.py # Compression multi-algo
-│   ├── cleanup.py    # Nettoyage automatique
-│   ├── helpers.py    # Fonctions utilitaires
-│   └── validators.py # Validateurs
 ├── models/           # Modèles de données
-│   ├── __init__.py
-│   ├── database.py   # Modèles SQLAlchemy
-│   ├── enums.py      # Énumérations
-│   └── schemas.py    # Schémas Pydantic
-├── config/           # Configuration
-│   ├── __init__.py
-│   ├── database.py   # Configuration DB
-│   └── settings.py   # Settings Pydantic
-└── ui/               # Interface utilisateur (legacy)
-    ├── __init__.py
-    ├── app.py        # App Reflex (déprécié)
-    ├── components/   # Composants réutilisables
-    └── styles.py     # Thème sombre et styles
+└── config/           # Configuration
+
+examples/             # Applications d'exemple
+├── fastapi/          # Exemple API REST avancée
+├── streamlit/        # Interface interactive
+└── reflex/           # Interface Python-native (legacy)
+
+requirements/         # Dépendances organisées
+├── base.txt          # Dépendances principales
+├── dev.txt           # Développement
+├── prod.txt          # Production
+└── ml.txt            # Machine Learning
+
+docs/                 # Documentation complète
+tests/                # Tests unitaires et d'intégration
+.tmp/                 # Fichiers temporaires (logs, cache, db)
 ```
 
 ### Technologies utilisées
@@ -414,9 +418,9 @@ poetry run pytest --cov=scrapinium tests/
 poetry run ruff check src/
 poetry run ruff format src/
 
-# Tests manuels des modules
-poetry run python -c "from scrapinium.config import settings; print('✓ Config OK')"
-poetry run python -c "from scrapinium.api.app import app; print('✓ API OK')"
+# Tests des exemples
+python examples/fastapi/app.py &
+curl http://localhost:8000/health
 ```
 
 ### Tests fonctionnels
@@ -425,10 +429,13 @@ poetry run python -c "from scrapinium.api.app import app; print('✓ API OK')"
 # Test complet via API
 make test
 
-# Test de scraping simple
-curl -X POST "http://localhost:8000/scrape" \
+# Test de scraping simple via exemple FastAPI
+curl -X POST "http://localhost:8001/scrape" \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com", "output_format": "markdown", "use_llm": false}'
+
+# Test via interface Streamlit
+streamlit run examples/streamlit/streamlit_app.py
 ```
 
 ## 📚 Commandes disponibles
@@ -471,9 +478,17 @@ make shell            # Lance un shell Python avec le contexte
 - [x] Compression et streaming optimisés
 - [x] Nettoyage automatique des ressources
 
-### v0.3.0 - Features avancées (En cours)
+### ✅ v0.3.0 - ML Integration (Juin 2025) - TERMINÉ
+- [x] **Pipeline ML complet** avec classification, anti-bot, analyse sémantique
+- [x] **7 nouveaux endpoints ML** dans l'API REST
+- [x] **Cache ML intelligent** avec parallélisation pour performances optimales
+- [x] **Analyse automatique** intégrée dans le workflow de scraping
+- [x] **Tests complets** avec 19 tests unitaires ML
+
+### v0.4.0 - Features avancées (En cours)
 - [ ] Support multi-LLM (OpenAI, Anthropic, Gemini)
 - [ ] WebSockets pour updates temps réel
+- [ ] Interface web ML avec dashboards
 - [ ] Scraping distribué avec Celery
 - [ ] Rate limiting intelligent par domaine
 - [ ] Export vers multiple formats (PDF, CSV, XML)
@@ -525,9 +540,9 @@ Pour toute question ou problème :
 
 ## 🚀 Statut du projet
 
-**Version actuelle** : 0.1.0  
-**Statut** : ✅ Fonctionnel - API complète, scraping opérationnel, LLM intégré  
-**Dernière mise à jour** : Janvier 2025
+**Version actuelle** : 0.3.0  
+**Statut** : ✅ Production Ready - API complète, ML pipeline intégré, structure professionnelle  
+**Dernière mise à jour** : Juin 2025
 
 ---
 

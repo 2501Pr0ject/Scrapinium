@@ -1,6 +1,7 @@
 """Pipeline Machine Learning intégré pour Scrapinium."""
 
 import asyncio
+import hashlib
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
@@ -33,51 +34,107 @@ class MLAnalysisResult:
 class MLPipeline:
     """Pipeline ML intégré pour l'analyse intelligente de contenu web."""
     
-    def __init__(self):
+    def __init__(self, enable_cache: bool = True):
         self.content_classifier = ContentClassifier()
         self.antibot_detector = AntibotDetector()
         self.content_analyzer = ContentAnalyzer()
+        
+        # Cache en mémoire pour les analyses ML
+        self.enable_cache = enable_cache
+        self.cache = {} if enable_cache else None
+        self.cache_ttl = 3600  # 1 heure
         
         # Métriques de performance
         self.analysis_history = []
         self.performance_stats = {
             'total_analyses': 0,
             'avg_processing_time': 0.0,
-            'success_rate': 0.0
+            'success_rate': 0.0,
+            'cache_hits': 0,
+            'cache_misses': 0
         }
     
+    def _generate_cache_key(self, html: str, url: str, headers: Dict[str, str] = None) -> str:
+        """Génère une clé de cache basée sur le contenu."""
+        content = f"{url}:{html[:1000]}"  # Utiliser les premiers 1000 chars
+        if headers:
+            content += f":{sorted(headers.items())}"
+        return hashlib.md5(content.encode()).hexdigest()
+    
+    def _get_from_cache(self, cache_key: str) -> Optional[MLAnalysisResult]:
+        """Récupère un résultat du cache."""
+        if not self.enable_cache or not self.cache:
+            return None
+        
+        if cache_key in self.cache:
+            result, timestamp = self.cache[cache_key]
+            # Vérifier TTL
+            if (datetime.now() - timestamp).total_seconds() < self.cache_ttl:
+                self.performance_stats['cache_hits'] += 1
+                return result
+            else:
+                # Cache expiré
+                del self.cache[cache_key]
+        
+        self.performance_stats['cache_misses'] += 1
+        return None
+    
+    def _store_in_cache(self, cache_key: str, result: MLAnalysisResult):
+        """Stocke un résultat dans le cache."""
+        if not self.enable_cache or not self.cache:
+            return
+        
+        self.cache[cache_key] = (result, datetime.now())
+        
+        # Nettoyer le cache si trop grand (garder 1000 entrées max)
+        if len(self.cache) > 1000:
+            # Supprimer les 100 plus anciennes entrées
+            oldest_keys = sorted(self.cache.keys(), 
+                               key=lambda k: self.cache[k][1])[:100]
+            for key in oldest_keys:
+                del self.cache[key]
+
     async def analyze_page(self, html: str, url: str, headers: Dict[str, str] = None, 
                           response_time: float = None, metadata: Dict[str, Any] = None) -> MLAnalysisResult:
-        """Analyse complète d'une page web avec ML."""
+        """Analyse complète d'une page web avec ML (optimisée avec cache et parallélisation)."""
+        
+        # Vérifier le cache d'abord
+        cache_key = self._generate_cache_key(html, url, headers)
+        cached_result = self._get_from_cache(cache_key)
+        if cached_result:
+            return cached_result
         
         start_time = datetime.now()
         
         try:
-            # 1. Classification du contenu
-            classification = self.content_classifier.classify_page(
-                html=html, 
-                url=url, 
-                metadata=metadata
+            # Analyses en parallèle pour optimiser les performances
+            classification_task = asyncio.create_task(
+                asyncio.to_thread(self.content_classifier.classify_page,
+                                html=html, url=url, metadata=metadata)
             )
             
-            # 2. Détection anti-bot
-            bot_detection = self.antibot_detector.analyze_page(
-                html=html,
-                headers=headers or {},
-                url=url,
-                response_time=response_time
+            bot_detection_task = asyncio.create_task(
+                asyncio.to_thread(self.antibot_detector.analyze_page,
+                                html=html, headers=headers or {}, 
+                                url=url, response_time=response_time)
             )
             
-            # 3. Analyse de contenu avancée
+            # Attendre les deux premières analyses
+            classification, bot_detection = await asyncio.gather(
+                classification_task, bot_detection_task
+            )
+            
+            # 3. Analyse de contenu avancée (dépend de la classification)
             text_content = classification.features.get('text_content', '')
-            content_features = self.content_analyzer.analyze_content(
-                html=html,
-                text_content=text_content,
-                url=url
+            content_features = await asyncio.to_thread(
+                self.content_analyzer.analyze_content,
+                html=html, text_content=text_content, url=url
             )
             
-            # 4. Générer le résumé de contenu
-            content_summary = self.content_analyzer.generate_content_summary(content_features)
+            # 4. Générer le résumé de contenu (en parallèle avec les calculs suivants)
+            content_summary_task = asyncio.create_task(
+                asyncio.to_thread(self.content_analyzer.generate_content_summary, content_features)
+            )
             
             # 5. Calculer le temps de traitement
             processing_time = (datetime.now() - start_time).total_seconds()
@@ -87,14 +144,20 @@ class MLPipeline:
                 classification, bot_detection, content_features
             )
             
-            # 7. Générer les recommandations
-            recommendations = self._generate_recommendations(
-                classification, bot_detection, content_summary
+            # 8. Créer la configuration de scraping (en parallèle)
+            scraping_config_task = asyncio.create_task(
+                asyncio.to_thread(self._create_scraping_config,
+                                classification, bot_detection, content_features)
             )
             
-            # 8. Créer la configuration de scraping optimisée
-            scraping_config = self._create_scraping_config(
-                classification, bot_detection, content_features
+            # Attendre les tâches restantes
+            content_summary, scraping_config = await asyncio.gather(
+                content_summary_task, scraping_config_task
+            )
+            
+            # 7. Générer les recommandations (après avoir obtenu content_summary)
+            recommendations = self._generate_recommendations(
+                classification, bot_detection, content_summary
             )
             
             # Créer le résultat complet
@@ -111,6 +174,9 @@ class MLPipeline:
             
             # Mettre à jour les statistiques
             self._update_performance_stats(result, success=True)
+            
+            # Stocker en cache
+            self._store_in_cache(cache_key, result)
             
             return result
             
@@ -267,6 +333,69 @@ class MLPipeline:
         })
         
         return metrics
+    
+    def clear_cache(self) -> Dict[str, Any]:
+        """Vide le cache ML et retourne les statistiques."""
+        if not self.enable_cache or not self.cache:
+            return {"cache_enabled": False}
+        
+        entries_cleared = len(self.cache)
+        self.cache.clear()
+        
+        return {
+            "cache_enabled": True,
+            "entries_cleared": entries_cleared,
+            "cache_hits": self.performance_stats.get('cache_hits', 0),
+            "cache_misses": self.performance_stats.get('cache_misses', 0)
+        }
+    
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Retourne les statistiques détaillées du cache."""
+        if not self.enable_cache or not self.cache:
+            return {"cache_enabled": False}
+        
+        now = datetime.now()
+        expired_entries = 0
+        
+        for cache_key, (result, timestamp) in list(self.cache.items()):
+            if (now - timestamp).total_seconds() >= self.cache_ttl:
+                expired_entries += 1
+        
+        total_requests = self.performance_stats.get('cache_hits', 0) + self.performance_stats.get('cache_misses', 0)
+        hit_rate = (self.performance_stats.get('cache_hits', 0) / total_requests * 100) if total_requests > 0 else 0
+        
+        return {
+            "cache_enabled": True,
+            "total_entries": len(self.cache),
+            "expired_entries": expired_entries,
+            "cache_hits": self.performance_stats.get('cache_hits', 0),
+            "cache_misses": self.performance_stats.get('cache_misses', 0),
+            "hit_rate_percent": round(hit_rate, 2),
+            "cache_ttl_seconds": self.cache_ttl
+        }
+    
+    def optimize_cache(self) -> Dict[str, Any]:
+        """Nettoie le cache en supprimant les entrées expirées."""
+        if not self.enable_cache or not self.cache:
+            return {"cache_enabled": False}
+        
+        now = datetime.now()
+        initial_count = len(self.cache)
+        expired_keys = []
+        
+        for cache_key, (result, timestamp) in list(self.cache.items()):
+            if (now - timestamp).total_seconds() >= self.cache_ttl:
+                expired_keys.append(cache_key)
+        
+        for key in expired_keys:
+            del self.cache[key]
+        
+        return {
+            "cache_enabled": True,
+            "initial_entries": initial_count,
+            "removed_entries": len(expired_keys),
+            "remaining_entries": len(self.cache)
+        }
     
     def _get_page_types_distribution(self) -> Dict[str, int]:
         """Retourne la distribution des types de pages analysées."""

@@ -372,12 +372,13 @@ class AntibotDetector:
             min_delay, max_delay = (0.5, 2.0)
         
         # Distribution plus réaliste (pas uniforme)
-        # Utiliser une distribution beta pour simuler les temps de réaction humains
-        import numpy as np
+        # Simuler une distribution beta sans numpy
+        # Utiliser une approximation avec random.random()
         
-        # Paramètres pour distribution beta (forme de cloche asymétrique)
-        alpha, beta = 2, 5
-        random_factor = np.random.beta(alpha, beta)
+        # Simulation simple d'une distribution asymétrique
+        r1, r2 = random.random(), random.random()
+        # Transformation pour simuler une distribution beta(2,5)
+        random_factor = r1 * r1 * (1 - r2)
         
         delay = min_delay + (max_delay - min_delay) * random_factor
         

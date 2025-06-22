@@ -200,3 +200,28 @@ ehthumbs.db
 tmp/
 temp/
 scratch/
+
+# ====== NEW ORGANIZATION PATTERNS ======
+
+# Temporary files (new .tmp/ directory)
+.tmp/
+*.log
+*.db
+
+# Coverage reports  
+htmlcov/
+coverage.xml
+.coverage
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Application artifacts moved to examples/
+examples/*/logs/
+examples/*/cache/
+examples/*/*.db
+
+# Claude development tracking (private)
+.claude/
