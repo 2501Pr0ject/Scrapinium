@@ -1,0 +1,11 @@
+# Namespace Kubernetes pour Scrapinium
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: scrapinium
+  labels:
+    app: scrapinium
+    environment: production
+    version: v2.0.0
+  annotations:
+    description: "Enterprise-grade web scraping solution with LLM integration"

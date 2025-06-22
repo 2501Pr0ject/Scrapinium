@@ -1,0 +1,97 @@
+# Docker Compose override pour le développement local
+# Ce fichier est automatiquement utilisé par docker-compose
+# Utilisation: docker-compose up (pas besoin de spécifier ce fichier)
+
+version: '3.8'
+
+services:
+  scrapinium:
+    # Override pour le développement
+    build:
+      dockerfile: Dockerfile  # Utilise le Dockerfile de dev à la racine
+    volumes:
+      # Montage du code source pour le hot reload
+      - .:/app
+      - /app/node_modules  # Éviter d'écraser node_modules si présent
+    environment:
+      # Variables de développement
+      - SCRAPINIUM_ENV=development
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+    ports:
+      # Exposer plus de ports pour le debugging
+      - "8000:8000"
+      - "8001:8001"  # Pour le profiler si nécessaire
+    command: >
+      uvicorn src.scrapinium.api.app:app 
+      --host 0.0.0.0 
+      --port 8000 
+      --reload 
+      --log-level debug
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - scrapinium-dev
+
+  # Service Redis pour le développement
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - scrapinium-dev
+
+  # Service PostgreSQL pour le développement
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=scrapinium_dev
+      - POSTGRES_USER=scrapinium
+      - POSTGRES_PASSWORD=dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./config/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - scrapinium-dev
+
+  # Interface d'administration Redis (optionnel)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - scrapinium-dev
+    profiles:
+      - admin  # Utiliser avec: docker-compose --profile admin up
+
+  # Interface d'administration PostgreSQL (optionnel)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@scrapinium.local
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres
+    networks:
+      - scrapinium-dev
+    profiles:
+      - admin  # Utiliser avec: docker-compose --profile admin up
+
+volumes:
+  redis_dev_data:
+  postgres_dev_data:
+
+networks:
+  scrapinium-dev:
+    driver: bridge
