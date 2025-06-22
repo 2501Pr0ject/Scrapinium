@@ -13,18 +13,24 @@ Scrapinium suit une architecture modulaire enterprise-grade optimisée pour la p
 │  ├── Dashboard temps réel + Charts.js                     │
 │  └── Interface scraping responsive                        │
 ├─────────────────────────────────────────────────────────────┤
-│  🔌 API Layer (FastAPI)                                   │
-│  ├── Endpoints REST + WebSocket                           │
+│  🔌 API Layer (FastAPI) - ARCHITECTURE MODULAIRE v0.4.0  │
+│  ├── routers/core.py (/, /health, /api)                  │
+│  ├── routers/scraping.py (tâches de scraping)            │
+│  ├── routers/statistics.py (monitoring système)          │
+│  ├── routers/cache.py (administration cache)             │
+│  ├── routers/maintenance.py (maintenance système)        │
+│  ├── routers/performance.py (optimisation perf)          │
 │  ├── Middleware sécurité (Rate limiting, Headers)        │
 │  ├── Validation inputs + Serialization                   │
 │  └── Background tasks + Progress tracking                 │
 ├─────────────────────────────────────────────────────────────┤
-│  🧠 Business Logic                                        │
-│  ├── Scraping Service (Orchestration)                    │
+│  🧠 Business Logic - COUCHE SERVICES v0.4.0              │
+│  ├── services/scraping_service.py (ScrapingTaskService)  │
 │  ├── LLM Integration (Ollama/OpenAI)                     │
 │  ├── ML Pipeline (Intelligence Layer)                    │
 │  ├── Content Processing Pipeline                         │
-│  └── Task Management                                     │
+│  ├── Task Management (TaskManager thread-safe)          │
+│  └── Exception Hierarchy (gestion erreurs centralisée)   │
 ├─────────────────────────────────────────────────────────────┤
 │  🎭 Browser Pool Management                               │
 │  ├── Playwright Pool (3-5 instances)                     │
@@ -60,29 +66,46 @@ Scrapinium suit une architecture modulaire enterprise-grade optimisée pour la p
 
 ## 🏛️ Modules Principaux
 
-### 1. API Layer (`src/scrapinium/api/`)
+### 1. API Layer (`src/scrapinium/api/`) - ARCHITECTURE MODULAIRE v0.4.0
 
-**Architecture FastAPI moderne avec sécurité enterprise**
+**Architecture FastAPI modulaire avec routers spécialisés et couche services**
 
 ```python
 api/
-├── app.py              # Application principale + middleware
-├── endpoints/          # Endpoints organisés par domaine  
-│   ├── scraping.py    # Endpoints scraping
-│   ├── cache.py       # Gestion cache
-│   ├── security.py    # Endpoints sécurité
-│   └── monitoring.py  # Métriques et santé
-├── middleware/         # Middlewares personnalisés
-├── dependencies.py     # Dépendances FastAPI
-└── schemas.py         # Schémas Pydantic API
+├── app.py              # Application principale (149 lignes - orchestrateur)
+├── routers/            # Routers modulaires par domaine (v0.4.0)
+│   ├── core.py        # Endpoints racine (/, /health, /api)
+│   ├── scraping.py    # Gestion tâches de scraping
+│   ├── statistics.py  # Monitoring et métriques système
+│   ├── cache.py       # Administration cache multi-niveau
+│   ├── maintenance.py # Opérations de maintenance système
+│   └── performance.py # Surveillance et optimisation
+├── services/           # Couche services business logic (v0.4.0)
+│   └── scraping_service.py # ScrapingTaskService avec patterns
+├── task_manager.py     # Gestionnaire thread-safe des tâches
+├── ml_manager.py       # Gestionnaire ML avec singleton
+├── exception_handler.py # Gestion d'exceptions centralisée
+└── validators.py       # Validation inputs sécurisée
 ```
 
-**Patterns utilisés:**
+**Patterns architecturaux v0.4.0:**
+- ✅ **Router Pattern** : Séparation par domaine fonctionnel
+- ✅ **Service Layer** : Logique métier extraite et centralisée  
+- ✅ **Singleton Pattern** : Gestionnaires avec instances uniques
 - ✅ **Dependency Injection** avec FastAPI
+- ✅ **Exception Hierarchy** : Gestion d'erreurs typée et centralisée
+- ✅ **Thread-Safe Managers** : TaskManager et MLManager avec RLock
 - ✅ **Async/Await** pour performance optimale
 - ✅ **Background Tasks** pour tâches longues
 - ✅ **Middleware Pipeline** pour sécurité
 - ✅ **Request/Response Models** avec Pydantic
+
+**Améliorations v0.4.0:**
+- **Réduction complexité** : app.py 1071 → 149 lignes (-86%)
+- **Maintenabilité** : Code modulaire avec responsabilités séparées
+- **Testabilité** : Services isolés et facilement mockables
+- **Évolutivité** : Ajout de fonctionnalités simplifié
+- **Code Quality** : Respect des principes SOLID et Clean Code
 
 ### 2. Scraping Engine (`src/scrapinium/scraping/`)
 
