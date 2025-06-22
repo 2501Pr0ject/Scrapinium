@@ -624,7 +624,6 @@ def main_layout() -> rx.Component:
 def create_ui_app():
     """Crée l'application Reflex."""
     app = rx.App(
-        state=ScrapiniumState,
         style={
             "font_family": "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         },
@@ -633,3 +632,7 @@ def create_ui_app():
     app.add_page(main_layout, route="/")
 
     return app
+
+
+# Instance globale de l'app
+app = create_ui_app()
