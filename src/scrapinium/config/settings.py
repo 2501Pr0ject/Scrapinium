@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     # Application
     app_name: str = "Scrapinium"
     app_version: str = "0.1.0"
-    debug: bool = False
+    debug: bool = True  # Mode développement activé
     host: str = Field(default="0.0.0.0")
     port: int = Field(default=8000)
 

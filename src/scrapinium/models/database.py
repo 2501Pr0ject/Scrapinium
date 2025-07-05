@@ -139,3 +139,39 @@ class UserAPIKey(Base, BaseModelMixin):
 
     # Relations
     user = relationship("User", back_populates="api_keys")
+
+
+class ScrapingTemplate(Base, BaseModelMixin):
+    """Modèle de template de scraping."""
+
+    __tablename__ = "scraping_templates"
+
+    # Identifiants
+    template_id = Column(
+        String(36), unique=True, index=True, default=lambda: str(uuid.uuid4())
+    )
+
+    # Informations de base
+    name = Column(String(100), nullable=False, index=True)
+    description = Column(String(500), nullable=True)
+    category = Column(String(50), nullable=False, index=True)
+    author = Column(String(100), nullable=True)
+
+    # Configuration
+    output_format = Column(String(20), nullable=False, default=OutputFormat.MARKDOWN.value)
+    llm_provider = Column(String(20), nullable=False, default=LLMProvider.OLLAMA.value)
+    llm_model = Column(String(100), nullable=True)
+
+    # Instructions et configuration
+    instructions = Column(Text, nullable=False)
+    css_selectors = Column(JSON, nullable=True)
+    example_urls = Column(JSON, nullable=True)  # Liste d'URLs d'exemple
+    tags = Column(JSON, nullable=True)  # Liste de tags
+
+    # État et métadonnées
+    is_public = Column(Boolean, default=True, nullable=False)
+    usage_count = Column(Integer, default=0, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    # Métadonnées
+    template_metadata = Column(JSON, nullable=True)

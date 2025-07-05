@@ -6,6 +6,7 @@ from typing import Any
 
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from ..config.settings import get_settings
 from ..config.database import init_database
@@ -22,7 +23,7 @@ from .ml_manager import get_ml_manager
 from .exception_handler import setup_exception_handlers
 
 # Routers modulaires
-from .routers import core, statistics, cache, maintenance, scraping, performance
+from .routers import core, statistics, cache, maintenance, scraping, performance, websocket, templates
 
 logger = get_logger("api")
 settings = get_settings()
@@ -104,7 +105,7 @@ def create_app() -> FastAPI:
 
     # Configuration des middlewares de sécurité (ordre important)
     app.middleware("http")(security_headers_middleware)
-    app.middleware("http")(rate_limit_middleware)
+    app.middleware("http")(rate_limit_middleware)  # Ajusté pour mode dev/prod
     
     # CORS sécurisé
     app.add_middleware(
@@ -117,13 +118,28 @@ def create_app() -> FastAPI:
         max_age=3600 if security_headers.production_mode else 300,
     )
 
+    # Fichiers statiques (CSS, JS, images)
+    import os
+    # Trouver le dossier racine du projet (4 niveaux au-dessus de ce fichier)
+    current_dir = os.path.dirname(__file__)  # /src/scrapinium/api/
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))  # /
+    static_dir = os.path.join(project_root, "static")
+    
+    if os.path.exists(static_dir):
+        app.mount("/static", StaticFiles(directory=static_dir), name="static")
+        logger.info(f"✅ Fichiers statiques montés depuis: {static_dir}")
+    else:
+        logger.warning(f"⚠️ Dossier static non trouvé: {static_dir}")
+    
     # Routes modulaires
     app.include_router(core.router)
     app.include_router(statistics.router)
     app.include_router(cache.router)
     app.include_router(maintenance.router)
     app.include_router(scraping.router)
+    app.include_router(templates.router)
     app.include_router(performance.router)
+    app.include_router(websocket.router)
     
     # Configuration des gestionnaires d'exceptions
     setup_exception_handlers(app)

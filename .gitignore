@@ -225,3 +225,10 @@ examples/*/*.db
 
 # Claude development tracking (private)
 .claude/
+
+# Personnal Documentations
+docs/
+CHANGELOG.md
+CONTRIBUTING.md
+ROADMAP.md
+TODO.md
