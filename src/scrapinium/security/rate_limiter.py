@@ -44,23 +44,52 @@ class ClientStats:
 class AdvancedRateLimiter:
     """Rate limiter avancé avec protection DoS."""
     
-    def __init__(self):
+    def __init__(self, debug_mode: bool = False):
         self.clients: Dict[str, ClientStats] = {}
-        self.rules: Dict[str, RateLimitRule] = {
-            "default": RateLimitRule(
-                requests_per_minute=60,
-                requests_per_hour=1000,
-                requests_per_day=10000,
-                burst_limit=10,
-                block_duration_minutes=15
-            ),
-            "scraping": RateLimitRule(
-                requests_per_minute=30,
-                requests_per_hour=500,
-                requests_per_day=5000,
-                burst_limit=5,
-                block_duration_minutes=30
-            ),
+        self.debug_mode = debug_mode
+        
+        # Limites en mode développement (beaucoup plus souples)
+        if debug_mode:
+            self.rules: Dict[str, RateLimitRule] = {
+                "default": RateLimitRule(
+                    requests_per_minute=300,  # 5 req/sec
+                    requests_per_hour=5000,
+                    requests_per_day=50000,
+                    burst_limit=50,  # 50 requêtes en burst
+                    block_duration_minutes=1  # Blocage de 1 minute seulement
+                ),
+                "scraping": RateLimitRule(
+                    requests_per_minute=120,  # 2 req/sec pour scraping
+                    requests_per_hour=2000,
+                    requests_per_day=20000,
+                    burst_limit=20,
+                    block_duration_minutes=2
+                ),
+                "maintenance": RateLimitRule(
+                    requests_per_minute=60,
+                    requests_per_hour=500,
+                    requests_per_day=5000,
+                    burst_limit=10,
+                    block_duration_minutes=1
+                )
+            }
+        # Limites en mode production (sécurisées)
+        else:
+            self.rules: Dict[str, RateLimitRule] = {
+                "default": RateLimitRule(
+                    requests_per_minute=60,
+                    requests_per_hour=1000,
+                    requests_per_day=10000,
+                    burst_limit=10,
+                    block_duration_minutes=15
+                ),
+                "scraping": RateLimitRule(
+                    requests_per_minute=30,
+                    requests_per_hour=500,
+                    requests_per_day=5000,
+                    burst_limit=5,
+                    block_duration_minutes=30
+                ),
             "maintenance": RateLimitRule(
                 requests_per_minute=10,
                 requests_per_hour=100,
@@ -340,20 +369,40 @@ class AdvancedRateLimiter:
         }
 
 
-# Instance globale
-rate_limiter = AdvancedRateLimiter()
+# Instance globale - sera initialisée avec les paramètres debug via get_rate_limiter()
+rate_limiter = None
+
+def get_rate_limiter(debug_mode: bool = False) -> AdvancedRateLimiter:
+    """Obtenir l'instance du rate limiter avec le mode debug approprié."""
+    global rate_limiter
+    if rate_limiter is None:
+        rate_limiter = AdvancedRateLimiter(debug_mode=debug_mode)
+        if debug_mode:
+            logger.info("🐛 Rate limiter initialisé en mode développement (limites souples)")
+        else:
+            logger.info("🛡️ Rate limiter initialisé en mode production (limites sécurisées)")
+    return rate_limiter
 
 
 async def rate_limit_middleware(request: Request, call_next):
     """Middleware de rate limiting."""
+    # Obtenir l'instance rate limiter avec détection du mode debug
+    try:
+        from ..config.settings import get_settings
+        settings = get_settings()
+        limiter = get_rate_limiter(debug_mode=settings.debug)
+    except Exception:
+        # Fallback en mode production si erreur
+        limiter = get_rate_limiter(debug_mode=False)
+    
     start_time = time.time()
     
     # Nettoyer périodiquement
     if int(start_time) % 300 == 0:  # Toutes les 5 minutes
-        rate_limiter.cleanup_old_records()
+        limiter.cleanup_old_records()
     
     # Vérifier la taille de la requête
-    if not await rate_limiter.check_request_size(request):
+    if not await limiter.check_request_size(request):
         raise HTTPException(
             status_code=413,
             detail="Requête trop volumineuse",
@@ -361,11 +410,11 @@ async def rate_limit_middleware(request: Request, call_next):
         )
     
     # Obtenir l'ID client et la règle
-    client_id = rate_limiter.get_client_id(request)
-    rule = rate_limiter.get_rule_for_endpoint(str(request.url.path))
+    client_id = limiter.get_client_id(request)
+    rule = limiter.get_rule_for_endpoint(str(request.url.path))
     
     # Vérifier les limites
-    is_limited, reason, retry_after = rate_limiter.is_rate_limited(client_id, rule)
+    is_limited, reason, retry_after = limiter.is_rate_limited(client_id, rule)
     
     if is_limited:
         raise HTTPException(
@@ -380,13 +429,13 @@ async def rate_limit_middleware(request: Request, call_next):
         )
     
     # Enregistrer la requête
-    rate_limiter.record_request(client_id, request)
+    limiter.record_request(client_id, request)
     
     # Continuer le traitement
     response = await call_next(request)
     
     # Ajouter les headers de rate limiting
-    stats = rate_limiter.clients.get(client_id)
+    stats = limiter.clients.get(client_id)
     if stats:
         remaining = max(0, rule.requests_per_minute - len(stats.minute_requests))
         reset_time = int((int(start_time / 60) + 1) * 60)

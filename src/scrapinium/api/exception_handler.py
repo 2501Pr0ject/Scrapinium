@@ -78,7 +78,8 @@ async def http_exception_handler(
     )
     
     response_data = APIResponse.error_response(
-        message=str(exc.detail)
+        errors=[str(exc.detail)],
+        message=f"HTTP {exc.status_code}"
     )
     
     return JSONResponse(
@@ -120,8 +121,8 @@ async def general_exception_handler(
         pass  # Fallback si impossible de récupérer les settings
     
     response_data = APIResponse.error_response(
-        message=message,
-        details=details
+        errors=[str(exc)] if details is None else [str(exc), details],
+        message=message
     )
     
     return JSONResponse(
@@ -149,8 +150,8 @@ def create_error_response(
     """Créer une réponse d'erreur standardisée."""
     
     response_data = APIResponse.error_response(
-        message=message,
-        details=details
+        errors=[str(exc)] if details is None else [str(exc), details],
+        message=message
     )
     
     return JSONResponse(

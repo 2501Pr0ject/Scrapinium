@@ -2,10 +2,11 @@
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 
-from ...models.schemas import APIResponse, ScrapingTaskCreate
+from ...models.schemas import APIResponse, ScrapingTaskCreate, BatchScrapingRequest, BatchScrapingResponse
 from ...utils.logging import get_logger
 from ..task_manager import get_task_manager
 from ..services.scraping_service import get_scraping_task_service
+from ..services.batch_service import get_batch_service
 
 logger = get_logger("scraping_router")
 
@@ -39,8 +40,32 @@ async def start_scraping(
     except Exception as e:
         logger.error(f"Erreur création tâche: {e}")
         return APIResponse.error_response(
-            message="Erreur lors de la création de la tâche",
-            details=str(e)
+            errors=[str(e)],
+            message="Erreur lors de la création de la tâche"
+        )
+
+
+@router.get("/batch", name="list_batch_jobs")
+async def list_batch_jobs(limit: int = 20):
+    """Lister les lots de scraping."""
+    try:
+        batch_service = get_batch_service()
+        batches = batch_service.list_batch_jobs(limit=limit)
+        
+        return APIResponse.success_response(
+            data={
+                "batches": [batch.model_dump() for batch in batches],
+                "total": len(batches),
+                "limit": limit
+            },
+            message="Liste des batches récupérée"
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur listage batches: {e}")
+        return APIResponse.error_response(
+            errors=[str(e)],
+            message="Erreur lors du listage des batches"
         )
 
 
@@ -156,5 +181,95 @@ async def list_tasks(limit: int = 50):
         },
         message="Liste des tâches récupérée"
     )
+
+
+# === BATCH PROCESSING ENDPOINTS ===
+
+@router.post("/batch", response_model=APIResponse)
+async def create_batch_scraping(batch_request: BatchScrapingRequest, background_tasks: BackgroundTasks):
+    """Créer et démarrer un lot de scraping."""
+    try:
+        batch_service = get_batch_service()
+        
+        # Créer le batch job
+        batch_response = batch_service.create_batch_job(batch_request)
+        
+        # Démarrer le traitement en arrière-plan
+        background_tasks.add_task(
+            batch_service.start_batch_job,
+            batch_response.batch_id
+        )
+        
+        logger.info(f"📦 Batch scraping créé: {batch_response.batch_id} avec {batch_response.total_urls} URLs")
+        
+        return APIResponse.success_response(
+            data=batch_response.model_dump(),
+            message=f"Batch scraping créé avec {batch_response.total_urls} URLs"
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur création batch scraping: {e}")
+        return APIResponse.error_response(
+            errors=[str(e)],
+            message="Erreur lors de la création du batch scraping"
+        )
+
+
+@router.get("/batch/{batch_id}", response_model=APIResponse)
+async def get_batch_status(batch_id: str):
+    """Récupérer le statut d'un batch de scraping."""
+    try:
+        batch_service = get_batch_service()
+        batch_info = batch_service.get_batch_job(batch_id)
+        
+        if not batch_info:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Batch {batch_id} non trouvé"
+            )
+        
+        return APIResponse.success_response(
+            data=batch_info.model_dump(),
+            message="Statut du batch récupéré"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Erreur récupération batch {batch_id}: {e}")
+        return APIResponse.error_response(
+            errors=[str(e)],
+            message="Erreur lors de la récupération du batch"
+        )
+
+
+
+
+@router.delete("/batch/{batch_id}", response_model=APIResponse)
+async def cancel_batch_job(batch_id: str):
+    """Annuler un batch de scraping."""
+    try:
+        batch_service = get_batch_service()
+        success = await batch_service.cancel_batch_job(batch_id)
+        
+        if not success:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Batch {batch_id} non trouvé ou impossible à annuler"
+            )
+        
+        return APIResponse.success_response(
+            data={"batch_id": batch_id, "status": "cancelled"},
+            message="Batch annulé avec succès"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Erreur annulation batch {batch_id}: {e}")
+        return APIResponse.error_response(
+            errors=[str(e)],
+            message="Erreur lors de l'annulation du batch"
+        )
 
 

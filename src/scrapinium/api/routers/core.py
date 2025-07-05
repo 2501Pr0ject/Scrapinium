@@ -1,7 +1,8 @@
 """Router pour les endpoints core (/, /api, /health)."""
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from ...models.schemas import APIResponse
 from ...utils.logging import get_logger
 from ..ml_manager import get_ml_manager
@@ -15,18 +16,32 @@ router = APIRouter()
 
 @router.get("/", response_class=HTMLResponse)
 async def root(request: Request):
-    """Interface web principale."""
-    # TODO: Servir l'interface HTML/JS depuis static/
-    return HTMLResponse(content="""
-    <html>
-        <head><title>Scrapinium API</title></head>
-        <body>
-            <h1>🕸️ Scrapinium API</h1>
-            <p>API de scraping intelligent avec LLMs</p>
-            <p><a href="/docs">📚 Documentation API</a></p>
-        </body>
-    </html>
-    """)
+    """Interface web principale - Dashboard moderne."""
+    try:
+        # Servir le dashboard HTML moderne
+        import os
+        # Trouver le dossier racine du projet (5 niveaux au-dessus de ce fichier)
+        current_dir = os.path.dirname(__file__)  # /src/scrapinium/api/routers/
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_dir))))  # /
+        template_path = os.path.join(project_root, "templates", "index.html")
+        
+        with open(template_path, "r", encoding="utf-8") as f:
+            html_content = f.read()
+        return HTMLResponse(content=html_content)
+    except FileNotFoundError:
+        logger.error("❌ Template index.html non trouvé")
+        # Fallback vers page simple
+        return HTMLResponse(content="""
+        <html>
+            <head><title>Scrapinium API</title></head>
+            <body>
+                <h1>🕸️ Scrapinium API</h1>
+                <p>API de scraping intelligent avec LLMs</p>
+                <p><a href="/docs">📚 Documentation API</a></p>
+                <p>❌ Dashboard moderne non disponible - Template manquant</p>
+            </body>
+        </html>
+        """)
 
 
 @router.get("/api")

@@ -334,6 +334,10 @@ class MemoryMonitor:
         
         return report
     
+    def get_detailed_stats(self) -> dict:
+        """Statistiques mémoire détaillées pour l'API."""
+        return self.get_memory_report()
+    
     async def emergency_cleanup(self) -> bool:
         """Nettoyage d'urgence en cas de mémoire critique."""
         logger.critical("🚨 NETTOYAGE D'URGENCE MÉMOIRE")

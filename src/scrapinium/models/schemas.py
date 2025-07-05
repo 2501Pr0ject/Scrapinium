@@ -71,6 +71,152 @@ class ScrapingTaskCreate(BasePydanticModel):
         return v
 
 
+class BatchScrapingRequest(BasePydanticModel):
+    """Modèle pour créer une tâche de scraping en lot."""
+
+    urls: list[HttpUrl] = Field(description="Liste des URLs à scraper", min_items=1, max_items=100)
+    batch_name: Optional[str] = Field(default=None, description="Nom du lot")
+    output_format: OutputFormat = Field(
+        default=OutputFormat.MARKDOWN, description="Format de sortie"
+    )
+    llm_provider: LLMProvider = Field(
+        default=LLMProvider.OLLAMA, description="Provider LLM"
+    )
+    llm_model: Optional[str] = Field(default=None, description="Modèle LLM spécifique")
+    parallel_limit: int = Field(default=3, ge=1, le=10, description="Nombre max de tâches parallèles")
+    delay_between_requests: float = Field(default=1.0, ge=0.1, le=10.0, description="Délai entre requêtes (secondes)")
+    user_id: Optional[str] = Field(default=None, description="ID utilisateur")
+
+    @validator("urls")
+    def validate_urls(cls, v):
+        if len(v) > 100:
+            raise ValueError("Maximum 100 URLs par lot")
+        
+        # Vérifier les URLs
+        for url in v:
+            url_str = str(url)
+            if not url_str.startswith(("http://", "https://")):
+                raise ValueError(f"URL invalide: {url_str}")
+            if len(url_str) > 2048:
+                raise ValueError(f"URL trop longue: {url_str}")
+        
+        # Supprimer les doublons
+        unique_urls = list(dict.fromkeys(v))
+        if len(unique_urls) != len(v):
+            raise ValueError("Doublons détectés dans la liste d'URLs")
+        
+        return unique_urls
+
+
+class BatchScrapingResponse(BasePydanticModel):
+    """Modèle de réponse pour un lot de scraping."""
+
+    batch_id: str
+    batch_name: Optional[str]
+    total_urls: int
+    status: str  # 'pending', 'running', 'completed', 'failed', 'cancelled'
+    progress: int = Field(ge=0, le=100, description="Pourcentage de completion")
+    completed_tasks: int = 0
+    failed_tasks: int = 0
+    running_tasks: int = 0
+    pending_tasks: int = 0
+    task_ids: list[str] = Field(default_factory=list, description="IDs des tâches individuelles")
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    estimated_completion: Optional[datetime] = None
+    results_summary: Optional[dict] = None
+
+
+# === SCHÉMAS TEMPLATES ===
+
+class ScrapingTemplateCreate(BasePydanticModel):
+    """Modèle pour créer un template de scraping."""
+
+    name: str = Field(min_length=1, max_length=100, description="Nom du template")
+    description: Optional[str] = Field(default=None, max_length=500, description="Description du template")
+    category: str = Field(min_length=1, max_length=50, description="Catégorie (e-commerce, news, etc.)")
+    output_format: OutputFormat = Field(default=OutputFormat.MARKDOWN, description="Format de sortie")
+    llm_provider: LLMProvider = Field(default=LLMProvider.OLLAMA, description="Provider LLM")
+    llm_model: Optional[str] = Field(default=None, description="Modèle LLM spécifique")
+    instructions: str = Field(min_length=1, max_length=2000, description="Instructions d'extraction")
+    example_urls: list[str] = Field(default_factory=list, max_items=5, description="URLs d'exemple")
+    css_selectors: Optional[dict[str, str]] = Field(default=None, description="Sélecteurs CSS optionnels")
+    is_public: bool = Field(default=True, description="Template public ou privé")
+    tags: list[str] = Field(default_factory=list, max_items=10, description="Tags pour recherche")
+    
+    @validator("name")
+    def validate_name(cls, v):
+        if not v.strip():
+            raise ValueError("Le nom ne peut pas être vide")
+        return v.strip()
+    
+    @validator("tags")
+    def validate_tags(cls, v):
+        # Nettoyer et normaliser les tags
+        cleaned_tags = []
+        for tag in v:
+            tag = tag.strip().lower()
+            if tag and tag not in cleaned_tags:
+                cleaned_tags.append(tag)
+        return cleaned_tags[:10]  # Limiter à 10 tags
+
+
+class ScrapingTemplateResponse(BasePydanticModel):
+    """Modèle de réponse pour un template de scraping."""
+
+    id: int
+    name: str
+    description: Optional[str]
+    category: str
+    output_format: OutputFormat
+    llm_provider: LLMProvider
+    llm_model: Optional[str]
+    instructions: str
+    example_urls: list[str]
+    css_selectors: Optional[dict[str, str]]
+    is_public: bool
+    tags: list[str]
+    usage_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+    author: Optional[str] = None
+
+
+class ScrapingTemplateUpdate(BasePydanticModel):
+    """Modèle pour mettre à jour un template de scraping."""
+
+    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    description: Optional[str] = Field(default=None, max_length=500)
+    category: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    output_format: Optional[OutputFormat] = None
+    llm_provider: Optional[LLMProvider] = None
+    llm_model: Optional[str] = None
+    instructions: Optional[str] = Field(default=None, min_length=1, max_length=2000)
+    example_urls: Optional[list[str]] = Field(default=None, max_items=5)
+    css_selectors: Optional[dict[str, str]] = None
+    is_public: Optional[bool] = None
+    tags: Optional[list[str]] = Field(default=None, max_items=10)
+
+
+class ScrapingWithTemplateRequest(BasePydanticModel):
+    """Modèle pour scraper avec un template."""
+
+    url: HttpUrl = Field(description="URL à scraper")
+    template_id: int = Field(description="ID du template à utiliser")
+    custom_instructions: Optional[str] = Field(default=None, max_length=1000, description="Instructions personnalisées supplémentaires")
+    override_format: Optional[OutputFormat] = Field(default=None, description="Format de sortie personnalisé")
+    
+    @validator("url")
+    def validate_url(cls, v):
+        url_str = str(v)
+        if not url_str.startswith(("http://", "https://")):
+            raise ValueError("L'URL doit commencer par http:// ou https://")
+        if len(url_str) > 2048:
+            raise ValueError("L'URL est trop longue (max 2048 caractères)")
+        return v
+
+
 class ScrapingTaskUpdate(BasePydanticModel):
     """Modèle pour mettre à jour une tâche de scraping."""
 
